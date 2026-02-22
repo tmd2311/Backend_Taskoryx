@@ -1,0 +1,20 @@
+package com.taskoryx.backend.dto.request.task;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+/**
+ * Request để di chuyển task trong Kanban board (drag & drop)
+ */
+@Data
+public class MoveTaskRequest {
+
+    @NotNull(message = "Cột đích không được để trống")
+    private UUID targetColumnId;
+
+    @NotNull(message = "Vị trí mới không được để trống")
+    private BigDecimal newPosition;
+}

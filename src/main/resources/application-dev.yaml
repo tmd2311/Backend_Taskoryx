@@ -1,0 +1,45 @@
+# ==================== DEVELOPMENT ENVIRONMENT ====================
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/taskoryx_dev
+    username: postgres
+    password: postgres
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: dev@example.com
+    password: dev_password
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: DEBUG
+    com.taskoryx: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: TRACE
+
+jwt:
+  secret: dev-secret-key-change-this-in-production-404E635266556A586E3272357538782F
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+application:
+  frontend-url: http://localhost:3000
