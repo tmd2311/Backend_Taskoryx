@@ -4,6 +4,7 @@ import com.taskoryx.backend.dto.response.notification.NotificationResponse;
 import com.taskoryx.backend.entity.*;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.NotificationRepository;
+import com.taskoryx.backend.repository.UserRepository;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public Page<NotificationResponse> getNotifications(UserPrincipal principal, int page, int size) {
@@ -52,19 +54,24 @@ public class NotificationService {
     }
 
     // ========== INTERNAL NOTIFICATION CREATORS ==========
+    // Nhận primitive values để tránh LazyInitializationException khi @Async chạy thread khác
 
     @Async
     @Transactional
-    public void notifyTaskAssigned(Task task, User assignee, User assigner) {
+    public void notifyTaskAssigned(UUID assigneeId, String assignerName,
+                                   UUID taskId, String taskTitle, String projectName) {
         try {
+            User assignee = userRepository.findById(assigneeId).orElse(null);
+            if (assignee == null) return;
+
             Notification notification = Notification.builder()
                     .user(assignee)
                     .type(Notification.NotificationType.TASK_ASSIGNED)
                     .title("Bạn được giao task mới")
                     .message(String.format("%s đã giao task '%s' cho bạn trong dự án '%s'",
-                            assigner.getFullName(), task.getTitle(), task.getProject().getName()))
+                            assignerName, taskTitle, projectName))
                     .relatedType(Notification.RelatedType.TASK)
-                    .relatedId(task.getId())
+                    .relatedId(taskId)
                     .build();
             notificationRepository.save(notification);
         } catch (Exception e) {
@@ -74,15 +81,19 @@ public class NotificationService {
 
     @Async
     @Transactional
-    public void notifyTaskCommented(Task task, User commenter, Comment comment) {
+    public void notifyTaskCommented(UUID taskId, String taskTitle,
+                                    String commenterName, UUID commenterId,
+                                    UUID assigneeId, UUID reporterId) {
         try {
-            // Notify task assignee
-            if (task.getAssignee() != null && !task.getAssignee().getId().equals(commenter.getId())) {
-                createCommentNotification(task, commenter, task.getAssignee());
+            // Notify assignee
+            if (assigneeId != null && !assigneeId.equals(commenterId)) {
+                userRepository.findById(assigneeId).ifPresent(assignee ->
+                        saveCommentNotification(assignee, commenterName, taskTitle, taskId));
             }
             // Notify reporter
-            if (!task.getReporter().getId().equals(commenter.getId())) {
-                createCommentNotification(task, commenter, task.getReporter());
+            if (reporterId != null && !reporterId.equals(commenterId)) {
+                userRepository.findById(reporterId).ifPresent(reporter ->
+                        saveCommentNotification(reporter, commenterName, taskTitle, taskId));
             }
         } catch (Exception e) {
             log.error("Failed to create comment notification", e);
@@ -91,16 +102,20 @@ public class NotificationService {
 
     @Async
     @Transactional
-    public void notifyMention(Task task, Comment comment, User mentioner, User mentioned) {
+    public void notifyMention(UUID mentionedId, String mentionerName,
+                              String taskTitle, UUID commentId) {
         try {
+            User mentioned = userRepository.findById(mentionedId).orElse(null);
+            if (mentioned == null) return;
+
             Notification notification = Notification.builder()
                     .user(mentioned)
                     .type(Notification.NotificationType.MENTION)
                     .title("Bạn được nhắc đến")
                     .message(String.format("%s đã nhắc đến bạn trong task '%s'",
-                            mentioner.getFullName(), task.getTitle()))
+                            mentionerName, taskTitle))
                     .relatedType(Notification.RelatedType.COMMENT)
-                    .relatedId(comment.getId())
+                    .relatedId(commentId)
                     .build();
             notificationRepository.save(notification);
         } catch (Exception e) {
@@ -108,15 +123,15 @@ public class NotificationService {
         }
     }
 
-    private void createCommentNotification(Task task, User commenter, User recipient) {
+    private void saveCommentNotification(User recipient, String commenterName,
+                                         String taskTitle, UUID taskId) {
         Notification notification = Notification.builder()
                 .user(recipient)
                 .type(Notification.NotificationType.TASK_COMMENTED)
                 .title("Bình luận mới trong task")
-                .message(String.format("%s đã bình luận trong task '%s'",
-                        commenter.getFullName(), task.getTitle()))
+                .message(String.format("%s đã bình luận trong task '%s'", commenterName, taskTitle))
                 .relatedType(Notification.RelatedType.TASK)
-                .relatedId(task.getId())
+                .relatedId(taskId)
                 .build();
         notificationRepository.save(notification);
     }

@@ -47,12 +47,12 @@ public class Task {
     @JoinColumn(name = "project_id", nullable = false, foreignKey = @ForeignKey(name = "fk_tasks_project"))
     private Project project;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "board_id", nullable = false, foreignKey = @ForeignKey(name = "fk_tasks_board"))
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "board_id", nullable = true, foreignKey = @ForeignKey(name = "fk_tasks_board"))
     private Board board;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "column_id", nullable = false, foreignKey = @ForeignKey(name = "fk_tasks_column"))
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "column_id", nullable = true, foreignKey = @ForeignKey(name = "fk_tasks_column"))
     private BoardColumn column;
 
     @Column(name = "task_number", nullable = false)
@@ -69,6 +69,11 @@ public class Task {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private TaskPriority priority = TaskPriority.MEDIUM;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private TaskStatus status = TaskStatus.TODO;
 
     @Column(nullable = false, precision = 10, scale = 2)
     @Builder.Default
@@ -138,6 +143,18 @@ public class Task {
         MEDIUM,
         HIGH,
         URGENT
+    }
+
+    /**
+     * Enum for task status (độc lập với Kanban column)
+     */
+    public enum TaskStatus {
+        TODO,        // Sẽ làm
+        IN_PROGRESS, // Đang làm
+        IN_REVIEW,   // Đang xem xét / review
+        RESOLVED,    // Đã xử lý
+        DONE,        // Đã hoàn thành
+        CANCELLED    // Đã hủy
     }
 
     /**

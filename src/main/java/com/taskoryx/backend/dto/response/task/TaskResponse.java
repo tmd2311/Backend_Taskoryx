@@ -28,6 +28,7 @@ public class TaskResponse {
     private String title;
     private String description;
     private Task.TaskPriority priority;
+    private Task.TaskStatus status;
     private BigDecimal position;
 
     // Project info
@@ -81,14 +82,15 @@ public class TaskResponse {
                 .title(task.getTitle())
                 .description(task.getDescription())
                 .priority(task.getPriority())
+                .status(task.getStatus())
                 .position(task.getPosition())
                 .projectId(task.getProject().getId())
                 .projectName(task.getProject().getName())
                 .projectKey(task.getProject().getKey())
-                .boardId(task.getBoard().getId())
-                .boardName(task.getBoard().getName())
-                .columnId(task.getColumn().getId())
-                .columnName(task.getColumn().getName())
+                .boardId(task.getBoard() != null ? task.getBoard().getId() : null)
+                .boardName(task.getBoard() != null ? task.getBoard().getName() : null)
+                .columnId(task.getColumn() != null ? task.getColumn().getId() : null)
+                .columnName(task.getColumn() != null ? task.getColumn().getName() : null)
                 .assigneeId(task.getAssignee() != null ? task.getAssignee().getId() : null)
                 .assigneeName(task.getAssignee() != null ? task.getAssignee().getFullName() : null)
                 .assigneeAvatar(task.getAssignee() != null ? task.getAssignee().getAvatarUrl() : null)

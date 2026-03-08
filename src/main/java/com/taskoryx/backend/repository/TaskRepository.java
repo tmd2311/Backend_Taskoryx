@@ -46,4 +46,8 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
                                   Pageable pageable);
 
     long countByProjectIdAndColumnId(UUID projectId, UUID columnId);
+
+    long countByProjectId(UUID projectId);
+
+    List<Task> findByProjectIdAndColumnIsNullOrderByCreatedAtDesc(UUID projectId);
 }

@@ -22,9 +22,5 @@ public class CreateUserRequest {
     @Size(max = 100)
     private String fullName;
 
-    @NotBlank(message = "Mật khẩu không được để trống")
-    @Size(min = 8, message = "Mật khẩu tối thiểu 8 ký tự")
-    private String password;
-
     private String phone;
 }

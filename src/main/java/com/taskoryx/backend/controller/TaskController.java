@@ -4,6 +4,7 @@ import com.taskoryx.backend.dto.request.task.CreateTaskRequest;
 import com.taskoryx.backend.dto.request.task.MoveTaskRequest;
 import com.taskoryx.backend.dto.request.task.TaskFilterRequest;
 import com.taskoryx.backend.dto.request.task.UpdateTaskRequest;
+import com.taskoryx.backend.dto.request.task.UpdateTaskStatusRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
 import com.taskoryx.backend.dto.response.PagedResponse;
 import com.taskoryx.backend.dto.response.task.TaskResponse;
@@ -25,11 +26,13 @@ import java.util.UUID;
 /**
  * REST Controller cho Task Management
  *
- * POST   /api/projects/{projectId}/tasks           - Tạo task mới
+ * POST   /api/projects/{projectId}/tasks           - Tạo task mới (boardId/columnId optional → backlog)
  * GET    /api/projects/{projectId}/tasks           - Danh sách tasks (có lọc/tìm kiếm)
+ * GET    /api/projects/{projectId}/backlog         - Danh sách tasks trong Backlog
  * GET    /api/tasks/{id}                           - Chi tiết task
  * PUT    /api/tasks/{id}                           - Cập nhật task
- * PATCH  /api/tasks/{id}/move                      - Di chuyển task (drag & drop)
+ * PATCH  /api/tasks/{id}/status                    - Cập nhật trạng thái task
+ * PATCH  /api/tasks/{id}/move                      - Di chuyển task (drag & drop, targetColumnId null → backlog)
  * DELETE /api/tasks/{id}                           - Xóa task
  * GET    /api/tasks/my                             - Tasks được giao cho tôi
  */
@@ -61,6 +64,14 @@ public class TaskController {
         return ResponseEntity.ok(ApiResponse.success(PagedResponse.of(result)));
     }
 
+    @GetMapping("/projects/{projectId}/backlog")
+    @Operation(summary = "Lấy danh sách tasks trong Backlog (chưa được đưa vào board nào)")
+    public ResponseEntity<ApiResponse<List<TaskSummaryResponse>>> getBacklog(
+            @PathVariable UUID projectId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(taskService.getBacklog(projectId, principal)));
+    }
+
     @GetMapping("/tasks/{id}")
     @Operation(summary = "Lấy chi tiết task")
     public ResponseEntity<ApiResponse<TaskResponse>> getTask(
@@ -77,6 +88,16 @@ public class TaskController {
             @Valid @RequestBody UpdateTaskRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật task thành công",
                 taskService.updateTask(id, request, principal)));
+    }
+
+    @PatchMapping("/tasks/{id}/status")
+    @Operation(summary = "Cập nhật trạng thái task (TODO / IN_PROGRESS / IN_REVIEW / RESOLVED / DONE / CANCELLED)")
+    public ResponseEntity<ApiResponse<TaskResponse>> updateTaskStatus(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody UpdateTaskStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái thành công",
+                taskService.updateTaskStatus(id, request, principal)));
     }
 
     @PatchMapping("/tasks/{id}/move")

@@ -23,6 +23,7 @@ public class TaskSummaryResponse {
     private String taskKey;
     private String title;
     private Task.TaskPriority priority;
+    private Task.TaskStatus status;
     private BigDecimal position;
     private UUID columnId;
     private UUID assigneeId;
@@ -39,6 +40,7 @@ public class TaskSummaryResponse {
                 .taskKey(task.getTaskKey())
                 .title(task.getTitle())
                 .priority(task.getPriority())
+                .status(task.getStatus())
                 .position(task.getPosition())
                 .columnId(task.getColumn() != null ? task.getColumn().getId() : null)
                 .assigneeId(task.getAssignee() != null ? task.getAssignee().getId() : null)

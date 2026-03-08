@@ -31,11 +31,15 @@ spring:
     open-in-view: false
 
   # ==================== MAIL CONFIGURATION ====================
+  # Hướng dẫn lấy App Password Gmail:
+  # 1. Vào Google Account → Security → 2-Step Verification (bật lên)
+  # 2. Tìm "App passwords" → Tạo mới → Chọn "Mail" + "Other" → Đặt tên "Taskoryx"
+  # 3. Copy 16 ký tự vào password bên dưới (không cần dấu cách)
   mail:
     host: smtp.gmail.com
     port: 587
-    username: your_email@gmail.com
-    password: your_app_password_here
+    username: clone1abc.23.11@gmail.com
+    password: prgc lsda cbap hubk
     properties:
       mail:
         smtp:
@@ -80,7 +84,7 @@ jwt:
 application:
   name: Taskoryx
   version: 1.0.0
-  frontend-url: http://localhost:3000
+  frontend-url: http://localhost:5173
   cors:
     allowed-origins:
       - http://localhost:3000

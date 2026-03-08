@@ -118,6 +118,12 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
+		<!-- Thymeleaf - HTML Email Templates -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+
 		<!-- ==================== DEVELOPMENT TOOLS ==================== -->
 
 		<!-- Spring Boot DevTools - Hot Reload -->

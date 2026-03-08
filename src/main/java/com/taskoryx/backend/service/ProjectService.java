@@ -18,6 +18,7 @@ import com.taskoryx.backend.repository.BoardColumnRepository;
 import com.taskoryx.backend.repository.BoardRepository;
 import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.ProjectRepository;
+import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.repository.UserRepository;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final BoardRepository boardRepository;
     private final BoardColumnRepository boardColumnRepository;
+    private final TaskRepository taskRepository;
 
     @Transactional(readOnly = true)
     public List<ProjectResponse> getMyProjects(UserPrincipal principal) {
@@ -117,6 +119,14 @@ public class ProjectService {
         if (!project.getOwner().getId().equals(principal.getId())) {
             throw new ForbiddenException("Chỉ chủ sở hữu mới có thể xóa dự án");
         }
+
+        long taskCount = taskRepository.countByProjectId(projectId);
+        if (taskCount > 0) {
+            throw new BadRequestException(
+                String.format("Không thể xóa dự án vì còn %d task đang tồn tại. " +
+                              "Vui lòng xóa hết task trước khi xóa dự án.", taskCount));
+        }
+
         projectRepository.delete(project);
     }
 

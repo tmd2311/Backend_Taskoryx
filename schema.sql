@@ -45,6 +45,7 @@ CREATE TABLE users (
     language VARCHAR(10) DEFAULT 'vi',
     email_verified BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
+    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     last_login_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -143,12 +144,13 @@ COMMENT ON COLUMN columns.task_limit IS 'WIP limit - giới hạn số lượng 
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL,
-    board_id UUID NOT NULL,
-    column_id UUID NOT NULL,
+    board_id UUID,
+    column_id UUID,
     task_number INTEGER NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     priority VARCHAR(20) DEFAULT 'MEDIUM',
+    status VARCHAR(20) DEFAULT 'TODO',
     position DECIMAL(10,2) NOT NULL,
     assignee_id UUID,
     reporter_id UUID NOT NULL,
@@ -407,8 +409,10 @@ CREATE INDEX idx_tasks_assignee ON tasks(assignee_id);
 CREATE INDEX idx_tasks_reporter ON tasks(reporter_id);
 CREATE INDEX idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX idx_tasks_priority ON tasks(priority);
+CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_position ON tasks(column_id, position);
 CREATE INDEX idx_tasks_completed_at ON tasks(completed_at);
+CREATE INDEX idx_tasks_backlog ON tasks(project_id) WHERE column_id IS NULL;
 CREATE INDEX idx_tasks_created_at ON tasks(created_at);
 
 -- Labels
@@ -528,7 +532,7 @@ CREATE TRIGGER task_completion_trigger BEFORE UPDATE ON tasks
 -- ==================== INITIAL DATA ====================
 
 -- Insert sample user (password: Admin@123)
-INSERT INTO users (id, username, email, password_hash, full_name, is_active, email_verified)
+INSERT INTO users (id, username, email, password_hash, full_name, is_active, email_verified, must_change_password)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
     'admin',
@@ -536,7 +540,8 @@ VALUES (
     '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8UeVrS9NdHsaLSwyHW', -- Admin@123
     'System Administrator',
     TRUE,
-    TRUE
+    TRUE,
+    FALSE
 );
 
 -- Insert sample project

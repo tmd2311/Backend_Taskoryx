@@ -12,7 +12,7 @@ import java.util.UUID;
 @Data
 public class MoveTaskRequest {
 
-    @NotNull(message = "Cột đích không được để trống")
+    // null = chuyển task về Backlog
     private UUID targetColumnId;
 
     @NotNull(message = "Vị trí mới không được để trống")

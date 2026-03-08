@@ -17,6 +17,7 @@ public class UpdateTaskRequest {
 
     private String description;
     private Task.TaskPriority priority;
+    private Task.TaskStatus status;
     private UUID assigneeId;
     private LocalDate startDate;
     private LocalDate dueDate;

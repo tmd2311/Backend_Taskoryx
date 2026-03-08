@@ -2,7 +2,6 @@ package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.dto.request.auth.LoginRequest;
 import com.taskoryx.backend.dto.request.auth.RefreshTokenRequest;
-import com.taskoryx.backend.dto.request.auth.RegisterRequest;
 import com.taskoryx.backend.dto.response.auth.AuthResponse;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.BadRequestException;
@@ -14,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,36 +24,8 @@ import java.time.LocalDateTime;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
-
-    @Transactional
-    public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email '" + request.getEmail() + "' đã được sử dụng");
-        }
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new BadRequestException("Tên đăng nhập '" + request.getUsername() + "' đã được sử dụng");
-        }
-
-        User user = User.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName())
-                .isActive(true)
-                .emailVerified(false)
-                .build();
-
-        userRepository.save(user);
-        log.info("New user registered: {}", user.getEmail());
-
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-
-        return buildAuthResponse(authentication, user);
-    }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
@@ -63,8 +33,7 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        User user = userRepository.findById(principal.getId())
-                .orElseThrow();
+        User user = userRepository.findById(principal.getId()).orElseThrow();
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
@@ -94,6 +63,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 
@@ -110,6 +80,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 }

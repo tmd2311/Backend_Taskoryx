@@ -42,4 +42,7 @@ public class AuthResponse {
 
     @Schema(description = "URL ảnh đại diện", example = "https://example.com/avatar.jpg", nullable = true)
     private String avatarUrl;
+
+    @Schema(description = "Người dùng phải đổi mật khẩu sau lần đăng nhập đầu tiên", example = "true")
+    private boolean mustChangePassword;
 }

@@ -76,7 +76,11 @@ public class CommentService {
         processMentions(comment, task, author);
 
         // Notify task reporter/assignee about new comment
-        notificationService.notifyTaskCommented(task, author, comment);
+        notificationService.notifyTaskCommented(
+                task.getId(), task.getTitle(),
+                author.getFullName(), author.getId(),
+                task.getAssignee() != null ? task.getAssignee().getId() : null,
+                task.getReporter().getId());
 
         return CommentResponse.from(comment);
     }
@@ -122,7 +126,9 @@ public class CommentService {
                 comment.getMentions().add(mention);
                 // Gửi notification
                 if (!mentionedUser.getId().equals(author.getId())) {
-                    notificationService.notifyMention(task, comment, author, mentionedUser);
+                    notificationService.notifyMention(
+                            mentionedUser.getId(), author.getFullName(),
+                            task.getTitle(), comment.getId());
                 }
             });
         }

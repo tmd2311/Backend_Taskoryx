@@ -21,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -36,6 +37,7 @@ public class AdminService {
     private final PermissionRepository permissionRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     // ===================== PERMISSION MANAGEMENT =====================
 
@@ -165,19 +167,28 @@ public class AdminService {
             throw new BadRequestException("Username '" + request.getUsername() + "' đã được sử dụng");
         }
 
+        String tempPassword = generateTemporaryPassword();
+
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .passwordHash(passwordEncoder.encode(tempPassword))
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .isActive(true)
                 .emailVerified(true)
+                .mustChangePassword(true)
                 .build();
 
         userRepository.save(user);
         log.info("Admin {} created user: {}", adminPrincipal.getEmail(), user.getEmail());
-        return AdminUserResponse.from(user);
+
+        // Gửi email chào mừng kèm mật khẩu tạm (async - không block)
+        emailService.sendWelcomeEmail(user.getEmail(), user.getFullName(), tempPassword);
+
+        return AdminUserResponse.from(user).toBuilder()
+                .temporaryPassword(tempPassword)
+                .build();
     }
 
     @Transactional
@@ -198,6 +209,7 @@ public class AdminService {
     public void resetUserPassword(UUID userId, String newPassword) {
         User user = findUserById(userId);
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(true);
         userRepository.save(user);
         log.info("Password reset for user: {}", user.getEmail());
     }
@@ -241,6 +253,16 @@ public class AdminService {
     }
 
     // ===================== HELPER METHODS =====================
+
+    private String generateTemporaryPassword() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(12);
+        for (int i = 0; i < 12; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
 
     private User findUserById(UUID userId) {
         return userRepository.findById(userId)
