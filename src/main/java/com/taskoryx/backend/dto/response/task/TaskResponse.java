@@ -72,8 +72,41 @@ public class TaskResponse {
     // Labels
     private List<LabelResponse> labels;
 
+    // Version info
+    private UUID versionId;
+    private String versionName;
+
+    // Category info
+    private UUID categoryId;
+    private String categoryName;
+
+    // Watchers
+    private long watcherCount;
+
+    // Parent task info
+    private UUID parentTaskId;
+    private String parentTaskKey;
+    private String parentTaskTitle;
+
+    // Sub tasks
+    private List<SubTaskInfo> subTasks;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SubTaskInfo {
+        private UUID id;
+        private String taskKey;
+        private String title;
+        private Task.TaskStatus status;
+        private Task.TaskPriority priority;
+        private UUID assigneeId;
+        private String assigneeName;
+    }
 
     public static TaskResponse from(Task task) {
         return TaskResponse.builder()
@@ -108,6 +141,25 @@ public class TaskResponse {
                 .completed(task.isCompleted())
                 .labels(task.getTaskLabels().stream()
                         .map(tl -> LabelResponse.from(tl.getLabel()))
+                        .collect(Collectors.toList()))
+                .versionId(task.getVersion() != null ? task.getVersion().getId() : null)
+                .versionName(task.getVersion() != null ? task.getVersion().getName() : null)
+                .categoryId(task.getCategory() != null ? task.getCategory().getId() : null)
+                .categoryName(task.getCategory() != null ? task.getCategory().getName() : null)
+                .watcherCount(task.getWatchers().size())
+                .parentTaskId(task.getParentTask() != null ? task.getParentTask().getId() : null)
+                .parentTaskKey(task.getParentTask() != null ? task.getParentTask().getTaskKey() : null)
+                .parentTaskTitle(task.getParentTask() != null ? task.getParentTask().getTitle() : null)
+                .subTasks(task.getSubTasks().stream()
+                        .map(sub -> SubTaskInfo.builder()
+                                .id(sub.getId())
+                                .taskKey(sub.getTaskKey())
+                                .title(sub.getTitle())
+                                .status(sub.getStatus())
+                                .priority(sub.getPriority())
+                                .assigneeId(sub.getAssignee() != null ? sub.getAssignee().getId() : null)
+                                .assigneeName(sub.getAssignee() != null ? sub.getAssignee().getFullName() : null)
+                                .build())
                         .collect(Collectors.toList()))
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())

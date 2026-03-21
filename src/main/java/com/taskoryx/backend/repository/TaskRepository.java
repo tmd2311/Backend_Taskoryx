@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,4 +51,23 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
     long countByProjectId(UUID projectId);
 
     List<Task> findByProjectIdAndColumnIsNullOrderByCreatedAtDesc(UUID projectId);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.project.id = :projectId AND t.status = :status")
+    long countByProjectIdAndStatus(@Param("projectId") UUID projectId, @Param("status") Task.TaskStatus status);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.assignee.id = :userId AND t.status NOT IN ('DONE', 'CANCELLED', 'RESOLVED')")
+    long countActiveByAssigneeId(@Param("userId") UUID userId);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.assignee.id = :userId AND t.dueDate = :today AND t.completedAt IS NULL")
+    long countDueTodayByAssigneeId(@Param("userId") UUID userId, @Param("today") LocalDate today);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.assignee.id = :userId AND t.completedAt >= :weekStart AND t.completedAt <= :weekEnd")
+    long countCompletedByAssigneeIdBetween(@Param("userId") UUID userId,
+                                           @Param("weekStart") LocalDateTime weekStart,
+                                           @Param("weekEnd") LocalDateTime weekEnd);
+
+    List<Task> findByAssigneeIdOrderByDueDateAsc(UUID assigneeId);
+
+    @Query("SELECT t FROM Task t WHERE t.assignee.id = :userId AND t.dueDate < :today AND t.completedAt IS NULL")
+    List<Task> findOverdueTasksByAssigneeId(@Param("userId") UUID userId, @Param("today") LocalDate today);
 }

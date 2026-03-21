@@ -33,4 +33,10 @@ public class CreateTaskRequest {
     private BigDecimal estimatedHours;
 
     private List<UUID> labelIds;
+
+    private UUID versionId;
+
+    private UUID categoryId;
+
+    private UUID parentTaskId;
 }

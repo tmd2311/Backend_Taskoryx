@@ -141,6 +141,47 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- ==================== WEBSOCKET ==================== -->
+
+		<!-- Spring WebSocket - Real-time notifications -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+
+		<!-- ==================== EXPORT ==================== -->
+
+		<!-- Apache POI - Excel Export -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.2.5</version>
+		</dependency>
+
+		<!-- ==================== 2FA (TOTP) ==================== -->
+
+		<!-- TOTP library for Two-Factor Authentication -->
+		<dependency>
+			<groupId>dev.samstevens.totp</groupId>
+			<artifactId>totp-spring-boot-starter</artifactId>
+			<version>1.7.1</version>
+		</dependency>
+
+		<!-- ==================== HTTP CLIENT (Webhooks) ==================== -->
+
+		<!-- OkHttp for Webhook HTTP calls -->
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
+			<version>4.12.0</version>
+		</dependency>
+
+		<!-- Jackson for JSON processing -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+
 		<!-- ==================== TESTING ==================== -->
 
 		<!-- Spring Boot Test -->

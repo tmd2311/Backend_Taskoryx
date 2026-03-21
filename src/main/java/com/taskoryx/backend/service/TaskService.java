@@ -10,6 +10,8 @@ import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.*;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
+import com.taskoryx.backend.entity.IssueCategory;
+import com.taskoryx.backend.entity.Version;
 import com.taskoryx.backend.repository.*;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,9 @@ public class TaskService {
     private final LabelRepository labelRepository;
     private final ProjectService projectService;
     private final NotificationService notificationService;
+    private final VersionRepository versionRepository;
+    private final IssueCategoryRepository issueCategoryRepository;
+    private final TaskWatcherService taskWatcherService;
 
     @Transactional
     public TaskResponse createTask(UUID projectId, CreateTaskRequest request, UserPrincipal principal) {
@@ -78,6 +83,27 @@ public class TaskService {
                         .map(p -> p.add(BigDecimal.valueOf(1000))).orElse(BigDecimal.valueOf(1000))
                 : BigDecimal.ZERO;
 
+        Version version = null;
+        if (request.getVersionId() != null) {
+            version = versionRepository.findById(request.getVersionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Version", "id", request.getVersionId()));
+        }
+
+        IssueCategory category = null;
+        if (request.getCategoryId() != null) {
+            category = issueCategoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("IssueCategory", "id", request.getCategoryId()));
+        }
+
+        Task parentTask = null;
+        if (request.getParentTaskId() != null) {
+            parentTask = taskRepository.findById(request.getParentTaskId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Task", "id", request.getParentTaskId()));
+            if (!parentTask.getProject().getId().equals(projectId)) {
+                throw new BadRequestException("Task cha phải thuộc cùng project");
+            }
+        }
+
         Task task = Task.builder()
                 .project(project)
                 .board(board)
@@ -92,6 +118,9 @@ public class TaskService {
                 .startDate(request.getStartDate())
                 .dueDate(request.getDueDate())
                 .estimatedHours(request.getEstimatedHours())
+                .version(version)
+                .category(category)
+                .parentTask(parentTask)
                 .build();
 
         task = taskRepository.save(task);
@@ -167,7 +196,52 @@ public class TaskService {
             assignLabels(task, request.getLabelIds());
         }
 
-        return TaskResponse.from(taskRepository.save(task));
+        // Handle version
+        if (request.isClearVersion()) {
+            task.setVersion(null);
+        } else if (request.getVersionId() != null) {
+            Version ver = versionRepository.findById(request.getVersionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Version", "id", request.getVersionId()));
+            task.setVersion(ver);
+        }
+
+        // Handle category
+        if (request.isClearCategory()) {
+            task.setCategory(null);
+        } else if (request.getCategoryId() != null) {
+            IssueCategory cat = issueCategoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("IssueCategory", "id", request.getCategoryId()));
+            task.setCategory(cat);
+        }
+
+        // Handle parent task
+        if (request.isClearParent()) {
+            task.setParentTask(null);
+        } else if (request.getParentTaskId() != null) {
+            if (request.getParentTaskId().equals(taskId)) {
+                throw new BadRequestException("Task không thể là task cha của chính nó");
+            }
+            Task parent = taskRepository.findById(request.getParentTaskId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Task", "id", request.getParentTaskId()));
+            if (!parent.getProject().getId().equals(task.getProject().getId())) {
+                throw new BadRequestException("Task cha phải thuộc cùng project");
+            }
+            // Tránh circular reference: parent không được là subtask của task hiện tại
+            if (parent.getParentTask() != null && parent.getParentTask().getId().equals(taskId)) {
+                throw new BadRequestException("Không thể tạo quan hệ cha-con vòng tròn");
+            }
+            task.setParentTask(parent);
+        }
+
+        Task saved = taskRepository.save(task);
+
+        // Notify watchers about task update
+        taskWatcherService.notifyWatchers(
+                taskId, principal.getId(),
+                "Task được cập nhật",
+                "Task '" + saved.getTitle() + "' đã được cập nhật");
+
+        return TaskResponse.from(saved);
     }
 
     @Transactional

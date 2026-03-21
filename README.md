@@ -1,4 +1,4 @@
-# 🎯 Taskoryx - Task Management System
+# Taskoryx - Phần mền quản lí công việc
 
 <div align="center">
 
@@ -9,93 +9,76 @@
 
 **Hệ thống quản lý công việc mạnh mẽ, linh hoạt và mã nguồn mở**
 
-[🚀 Bắt đầu](#-quick-start) • [📖 Tài liệu](#-documentation) • [✨ Tính năng](#-features) • [🤝 Đóng góp](#-contributing)
+[🚀 Bắt đầu](#-quick-start)  • [✨ Tính năng](#-) • [🤝 Đóng góp](#đóng-góp)
 
 </div>
 
 ---
 
-## 📋 Mục lục
+##  Mục lục
 
-- [Giới thiệu](#-giới-thiệu)
-- [Tính năng](#-features)
-- [Tech Stack](#-tech-stack)
-- [Quick Start](#-quick-start)
-- [Documentation](#-documentation)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Giới thiệu](#giới-thiệu)
+- [Chức năng](#chức-năng)
+- [Tech Stack](#tech-stack)
+- [Quick Start](#quick-start)
+- [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Đóng góp](#đóng-góp)
+- [License](#license)
+- [Liên hệ hỗ trợ](#liên-hệ-hỗ-trợ)
 
 ---
 
-## 🌟 Giới thiệu
+## Giới thiệu
 
 **Taskoryx** là một hệ thống quản lý task hiện đại, được thiết kế để giúp các team làm việc hiệu quả hơn. Lấy cảm hứng từ Trello và Jira, Taskoryx kết hợp tính đơn giản của Kanban board với sức mạnh của project management.
 
-### Tại sao chọn Taskoryx?
+## Chức năng
 
-✅ **Mã nguồn mở** - Hoàn toàn miễn phí và có thể tùy chỉnh
-✅ **Hiện đại** - Sử dụng các công nghệ mới nhất (Spring Boot 3, Java 17)
-✅ **Linh hoạt** - Dễ dàng mở rộng và tích hợp
-✅ **Hiệu năng cao** - Tối ưu cho cả small team và enterprise
-✅ **Tiếng Việt** - Hỗ trợ đa ngôn ngữ, ưu tiên tiếng Việt
+### Tính năng đã implement (v1.0)
 
----
+#### Chức năng gốc
+-  **Quản lý User** - Đăng ký, đăng nhập, phân quyền RBAC
+-  **Two-Factor Auth (2FA)** - TOTP / Google Authenticator
+-  **Quản lý Project** - Tạo workspace, quản lý members
+-  **Project Templates** - 4 mẫu dự án có sẵn (Software, Marketing, Design, Event)
+-  **Kanban Board** - Drag & drop tasks giữa các columns (WIP limit)
+-  **Task Management** - Tạo, sửa, xóa, assign, priority, deadline
+-  **Backlog** - Task chưa được lên board
+-  **Task Dependencies** - Phụ thuộc giữa tasks (circular detection)
+-  **Checklist** - Danh sách việc nhỏ trong task (với progress %)
+-  **Sprint / Milestone** - Lập kế hoạch sprint, burndown
+-  **Time Tracking** - Ghi nhận giờ làm việc, tự cập nhật actualHours
+-  **Comments & @Mentions** - Collaboration, gửi notification khi mention
+-  **File Attachments** - Đính kèm files (max 10MB)
+-  **Labels & Tags** - Phân loại tasks
+-  **Activity Feed** - Lịch sử mọi thay đổi trong project
+-  **Dashboard & Stats** - Thống kê theo project và cá nhân
+-  **Search & Filter** - Tìm kiếm nhanh
+-  **Export Excel** - Xuất danh sách task ra .xlsx (13 cột)
+-  **Webhooks** - Tích hợp Slack/Discord/hệ thống ngoài
+-  **WebSocket Real-time** - Kanban live update, notification real-time
 
-## ✨ Features
+#### Hiệu năng và bảo mật
+-  JWT Authentication (stateless)
+-  Two-Factor Authentication (TOTP/HOTP)
+-  Role-based Access Control (OWNER, ADMIN, MEMBER, VIEWER)
+-  BCrypt password hashing
+-  Database indexing & query optimization
+-  Pagination & async processing
 
-### 🎯 Phiên bản hiện tại (MVP)
+### Roadmap
 
-#### Core Features
-- ✅ **Quản lý User** - Đăng ký, đăng nhập, phân quyền
-- ✅ **Quản lý Project** - Tạo workspace, quản lý members
-- ✅ **Kanban Board** - Drag & drop tasks giữa các columns
-- ✅ **Task Management** - Tạo, sửa, xóa, assign tasks
-- ✅ **Deadline & Reminder** - Theo dõi timeline
-- ✅ **Comments & Mentions** - Collaboration với @mentions
-- ✅ **File Attachments** - Đính kèm files vào tasks
-- ✅ **Labels & Tags** - Phân loại tasks
-- ✅ **Search & Filter** - Tìm kiếm nhanh
-- ✅ **Multi-language** - Tiếng Việt & English
-
-#### Security
-- ✅ JWT Authentication
-- ✅ Role-based Access Control (OWNER, ADMIN, MEMBER, VIEWER)
-- ✅ Secure password hashing (BCrypt)
-
-#### Performance
-- ✅ Database indexing
-- ✅ Optimized queries
-- ✅ Efficient pagination
-
-### 🚀 Roadmap (Tính năng sắp tới)
-
-#### Phase 2 - Enhanced Features
-- ⏳ **Notifications** - Email & in-app notifications
-- ⏳ **Activity Log** - Theo dõi mọi thay đổi
-- ⏳ **Time Tracking** - Ghi lại thời gian làm việc
-- ⏳ **Calendar View** - Xem tasks theo lịch
-- ⏳ **List View** - Alternative view mode
-- ⏳ **Google Calendar Integration**
-
-#### Phase 3 - Advanced Features
-- 📅 **Task Dependencies** - Quản lý phụ thuộc giữa tasks
+#### Đang kế hoạch
 - 📅 **Gantt Chart** - Timeline visualization
-- 📅 **Automation** - Tự động hóa công việc lặp lại
-- 📅 **Custom Dashboard** - Dashboard tùy chỉnh
-- 📅 **Reports & Analytics** - Báo cáo chi tiết
+- 📅 **Calendar View** - Xem tasks theo lịch
+- 📅 **Automation Rules** - Tự động hóa (kéo vào Done → gửi email)
+- 📅 **Google Calendar Integration** - Đồng bộ deadline
 - 📅 **Mobile App** - iOS & Android
-
-#### Phase 4 - Integrations
-- 📅 **REST API** - Public API
-- 📅 **Webhooks** - Event-driven integrations
-- 📅 **Slack Integration**
-- 📅 **Microsoft Teams Integration**
-- 📅 **GitHub Integration**
+- 📅 **Docker Compose** - Triển khai 1 lệnh
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Backend
 - **Framework**: Spring Boot 3.2.1
@@ -109,8 +92,12 @@
 
 ### Libraries
 - **Lombok** - Reduce boilerplate code
-- **JJWT** - JWT implementation
+- **JJWT 0.12.3** - JWT implementation
 - **PostgreSQL Driver** - Database connectivity
+- **Apache POI 5.2.5** - Excel export
+- **TOTP Spring Boot Starter 1.7.1** - Two-Factor Authentication
+- **OkHttp 4.12.0** - Webhook HTTP client
+- **Spring WebSocket** - Real-time STOMP/SockJS
 
 ### Tools
 - **Git** - Version control
@@ -120,7 +107,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -191,84 +178,10 @@ Email: admin@taskoryx.com
 Password: Admin@123
 ```
 
----
-
-## 📖 Documentation
-
-### 📚 Available Documents
-
-| Document | Description |
-|----------|-------------|
-| [DATABASE_DESIGN.md](DATABASE_DESIGN.md) | Chi tiết thiết kế database, entities, relationships |
-| [ERD.md](ERD.md) | Entity Relationship Diagram với Mermaid |
-| [SETUP_GUIDE.md](SETUP_GUIDE.md) | Hướng dẫn chi tiết setup và development |
-| [CONFIG_GUIDE.md](CONFIG_GUIDE.md) | Configuration options và environment setup |
-| [QUICK_START.md](QUICK_START.md) | Quick start guide |
-
-### 📊 Database Schema
-
-Hệ thống sử dụng 15 tables chính:
-
-**Core Tables:**
-- `users` - Người dùng
-- `projects` - Dự án/Workspace
-- `project_members` - Thành viên dự án
-- `boards` - Bảng Kanban
-- `columns` - Cột trạng thái
-- `tasks` - Công việc
-
-**Collaboration Tables:**
-- `comments` - Bình luận
-- `comment_mentions` - Mentions (@user)
-- `attachments` - File đính kèm
-
-**Organization Tables:**
-- `labels` - Nhãn/tags
-- `task_labels` - Task-Label relationship
-
-**Advanced Tables:**
-- `notifications` - Thông báo
-- `activity_logs` - Lịch sử hoạt động
-- `time_tracking` - Theo dõi thời gian
-- `task_dependencies` - Phụ thuộc tasks
-
-Xem chi tiết trong [DATABASE_DESIGN.md](DATABASE_DESIGN.md)
-
-### 🔗 API Endpoints
-
-```
-Authentication:
-  POST   /api/auth/register
-  POST   /api/auth/login
-  POST   /api/auth/refresh
-
-Users:
-  GET    /api/users
-  GET    /api/users/{id}
-  PUT    /api/users/{id}
-  DELETE /api/users/{id}
-
-Projects:
-  GET    /api/projects
-  POST   /api/projects
-  GET    /api/projects/{id}
-  PUT    /api/projects/{id}
-  DELETE /api/projects/{id}
-
-Tasks:
-  GET    /api/projects/{projectId}/tasks
-  POST   /api/projects/{projectId}/tasks
-  GET    /api/tasks/{id}
-  PUT    /api/tasks/{id}
-  DELETE /api/tasks/{id}
-  PUT    /api/tasks/{id}/move
-```
-
-Full API documentation: http://localhost:8080/api/swagger-ui.html
 
 ---
 
-## 🏗️ Project Structure
+##  Cấu trúc dự án
 
 ```
 taskoryx-backend/
@@ -299,44 +212,9 @@ taskoryx-backend/
 ```
 
 ---
+## Đóng góp
 
-## 🎯 Roadmap
-
-### ✅ Phase 1: MVP (Hoàn thành)
-- [x] Database design
-- [x] Entity classes
-- [x] Basic CRUD operations
-- [x] Authentication & Authorization
-- [x] Kanban board functionality
-- [x] Task management
-
-### 🚧 Phase 2: Enhanced Features (Đang phát triển)
-- [ ] Notifications system
-- [ ] Activity logging
-- [ ] Time tracking
-- [ ] Advanced search
-- [ ] File upload to cloud
-- [ ] Email integration
-
-### 📅 Phase 3: Advanced Features (Q2 2025)
-- [ ] Task dependencies
-- [ ] Gantt chart
-- [ ] Automation rules
-- [ ] Custom dashboards
-- [ ] Advanced analytics
-
-### 📅 Phase 4: Integrations (Q3 2025)
-- [ ] Public REST API
-- [ ] Webhooks
-- [ ] Third-party integrations
-- [ ] Mobile app
-- [ ] Desktop app
-
----
-
-## 🤝 Contributing
-
-Chúng tôi rất hoan nghênh mọi đóng góp! Đây là dự án mã nguồn mở.
+Mình rất hoan nghênh mọi đóng góp! Đây là dự án mã nguồn mở.
 
 ### Cách đóng góp:
 
@@ -357,16 +235,16 @@ Chúng tôi rất hoan nghênh mọi đóng góp! Đây là dự án mã nguồn
 
 ### Areas needing help:
 
-- 🐛 Bug fixes
-- ✨ New features
-- 📝 Documentation
-- 🧪 Testing
-- 🌐 Translations
-- 🎨 UI/UX improvements
+-  Bug fixes
+-  New features
+-  Documentation
+-  Testing
+-  Translations
+-  UI/UX improvements
 
 ---
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -382,24 +260,14 @@ in the Software without restriction...
 
 ---
 
-## 👥 Team
-
-- **Project Lead**: [Your Name]
-- **Backend Developer**: [Names]
-- **Frontend Developer**: [Names]
-- **Database Designer**: [Names]
-
----
-
-## 📞 Contact & Support
+## Liên hệ hỗ trợ
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/taskoryx/issues)
-- **Email**: support@taskoryx.com
-- **Documentation**: [Wiki](https://github.com/yourusername/taskoryx/wiki)
+- **Email**: dung.kayc@gmail.com
 
 ---
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Spring Boot team for the amazing framework
 - PostgreSQL community
@@ -409,9 +277,9 @@ in the Software without restriction...
 
 <div align="center">
 
-**⭐ Nếu project này hữu ích, hãy cho chúng tôi một star! ⭐**
+**⭐ Nếu project này hữu ích, hãy cho mình một star! ⭐**
 
-Made with ❤️ by Taskoryx Team
+Made with ❤️ by DungTM
 
 [⬆ Back to top](#-taskoryx---task-management-system)
 

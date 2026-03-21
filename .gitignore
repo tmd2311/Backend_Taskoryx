@@ -49,6 +49,9 @@ log/
 *.db
 *.sql.backup
 
+### Documentation
+doc/
+
 ### Sensitive Files ###
 **/application-secret.yaml
 **/application-secret.yml

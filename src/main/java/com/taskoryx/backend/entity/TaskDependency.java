@@ -53,8 +53,12 @@ public class TaskDependency {
      * Enum for dependency types
      */
     public enum DependencyType {
-        BLOCKS,       // Task blocks another task
-        RELATES_TO    // Task is related to another task
+        BLOCKS,      // task chặn dependsOnTask (B không thể bắt đầu khi A chưa xong)
+        DEPENDS_ON,  // task phụ thuộc vào dependsOnTask (A không thể bắt đầu khi B chưa xong)
+        RELATES_TO,  // task liên quan đến dependsOnTask
+        DUPLICATES,  // task trùng với dependsOnTask
+        PRECEDES,    // task đứng trước dependsOnTask
+        FOLLOWS      // task đứng sau dependsOnTask
     }
 
     /**
@@ -62,7 +66,7 @@ public class TaskDependency {
      */
     @Transient
     public boolean isBlocking() {
-        return type == DependencyType.BLOCKS;
+        return type == DependencyType.BLOCKS || type == DependencyType.DEPENDS_ON;
     }
 
     /**
@@ -70,18 +74,17 @@ public class TaskDependency {
      */
     @Transient
     public String getDescription() {
-        if (task == null || dependsOnTask == null) {
-            return "";
-        }
-
-        String taskKey = task.getTaskKey();
-        String dependsKey = dependsOnTask.getTaskKey();
-
-        if (type == DependencyType.BLOCKS) {
-            return taskKey + " blocks " + dependsKey;
-        } else {
-            return taskKey + " relates to " + dependsKey;
-        }
+        if (task == null || dependsOnTask == null) return "";
+        String a = task.getTaskKey();
+        String b = dependsOnTask.getTaskKey();
+        return switch (type) {
+            case BLOCKS -> a + " blocks " + b;
+            case DEPENDS_ON -> a + " depends on " + b;
+            case RELATES_TO -> a + " relates to " + b;
+            case DUPLICATES -> a + " duplicates " + b;
+            case PRECEDES -> a + " precedes " + b;
+            case FOLLOWS -> a + " follows " + b;
+        };
     }
 
     @Override
