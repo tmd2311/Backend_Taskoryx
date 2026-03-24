@@ -9,6 +9,7 @@ import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.ForbiddenException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
+import com.taskoryx.backend.repository.CommentMentionRepository;
 import com.taskoryx.backend.repository.CommentRepository;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.repository.UserRepository;
@@ -17,8 +18,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 public class CommentService {
 
     private final CommentRepository commentRepository;
+    private final CommentMentionRepository commentMentionRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
@@ -96,6 +99,13 @@ public class CommentService {
 
         comment.setContent(request.getContent());
         comment.setIsEdited(true);
+
+        // Xóa mention cũ, parse lại từ nội dung mới
+        commentMentionRepository.deleteByCommentId(commentId);
+        comment.getMentions().clear();
+        comment = commentRepository.save(comment);
+        processMentions(comment, comment.getTask(), comment.getUser());
+
         return CommentResponse.from(commentRepository.save(comment));
     }
 
@@ -112,19 +122,20 @@ public class CommentService {
 
     private void processMentions(Comment comment, Task task, User author) {
         Matcher matcher = MENTION_PATTERN.matcher(comment.getContent());
-        List<String> mentionedUsernames = new ArrayList<>();
+        // Dùng LinkedHashSet để giữ thứ tự + loại trùng lặp
+        Set<String> uniqueUsernames = new LinkedHashSet<>();
         while (matcher.find()) {
-            mentionedUsernames.add(matcher.group(1));
+            uniqueUsernames.add(matcher.group(1));
         }
 
-        for (String username : mentionedUsernames) {
+        for (String username : uniqueUsernames) {
             userRepository.findByUsername(username).ifPresent(mentionedUser -> {
                 CommentMention mention = CommentMention.builder()
                         .comment(comment)
                         .user(mentionedUser)
                         .build();
                 comment.getMentions().add(mention);
-                // Gửi notification
+                // Gửi notification (không notify chính mình)
                 if (!mentionedUser.getId().equals(author.getId())) {
                     notificationService.notifyMention(
                             mentionedUser.getId(), author.getFullName(),

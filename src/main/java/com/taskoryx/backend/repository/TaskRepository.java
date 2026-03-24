@@ -52,6 +52,15 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
 
     List<Task> findByProjectIdAndColumnIsNullOrderByCreatedAtDesc(UUID projectId);
 
+    /**
+     * Product Backlog: tasks chưa có column VÀ không thuộc sprint nào đang PLANNED/ACTIVE
+     */
+    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.column IS NULL " +
+           "AND t.id NOT IN (SELECT st.id FROM Sprint s JOIN s.tasks st " +
+           "WHERE s.project.id = :projectId AND s.status IN ('PLANNED', 'ACTIVE')) " +
+           "ORDER BY t.createdAt DESC")
+    List<Task> findProductBacklog(@Param("projectId") UUID projectId);
+
     @Query("SELECT COUNT(t) FROM Task t WHERE t.project.id = :projectId AND t.status = :status")
     long countByProjectIdAndStatus(@Param("projectId") UUID projectId, @Param("status") Task.TaskStatus status);
 

@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -22,4 +23,7 @@ public class CreateSprintRequest {
     private LocalDate startDate;
 
     private LocalDate endDate;
+
+    /** Board SCRUM gắn với sprint này (optional) */
+    private UUID boardId;
 }

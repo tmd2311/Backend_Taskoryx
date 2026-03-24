@@ -66,6 +66,10 @@ public class Sprint {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "board_id", foreignKey = @ForeignKey(name = "fk_sprints_board"))
+    private Board board;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "sprint_tasks",
         joinColumns = @JoinColumn(name = "sprint_id"),

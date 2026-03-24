@@ -4,6 +4,7 @@ import com.taskoryx.backend.dto.request.project.AddMemberRequest;
 import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
 import com.taskoryx.backend.dto.request.project.UpdateMemberRoleRequest;
 import com.taskoryx.backend.dto.request.project.UpdateProjectRequest;
+import com.taskoryx.backend.dto.response.comment.MentionedUserInfo;
 import com.taskoryx.backend.dto.response.project.ProjectMemberResponse;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
 import com.taskoryx.backend.entity.Board;
@@ -136,6 +137,26 @@ public class ProjectService {
         return projectMemberRepository.findByProjectId(projectId)
                 .stream()
                 .map(ProjectMemberResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Tìm kiếm thành viên trong project để dùng cho @mention autocomplete.
+     * Chỉ trả thành viên thuộc project → đảm bảo FE chỉ suggest đúng người.
+     */
+    @Transactional(readOnly = true)
+    public List<MentionedUserInfo> searchMembersForMention(UUID projectId, String keyword,
+                                                            UserPrincipal principal) {
+        findProjectWithAccess(projectId, principal.getId());
+        return projectMemberRepository
+                .searchMembersByKeyword(projectId, keyword == null ? "" : keyword)
+                .stream()
+                .map(pm -> MentionedUserInfo.builder()
+                        .userId(pm.getUser().getId())
+                        .username(pm.getUser().getUsername())
+                        .fullName(pm.getUser().getFullName())
+                        .avatarUrl(pm.getUser().getAvatarUrl())
+                        .build())
                 .collect(Collectors.toList());
     }
 

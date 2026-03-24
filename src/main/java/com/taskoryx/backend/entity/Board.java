@@ -44,6 +44,11 @@ public class Board {
     @Column(nullable = false)
     private Integer position;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "board_type", nullable = false, length = 10)
+    @Builder.Default
+    private BoardType boardType = BoardType.KANBAN;
+
     @Column(name = "is_default", nullable = false)
     @Builder.Default
     private Boolean isDefault = false;
@@ -65,6 +70,11 @@ public class Board {
     @OneToMany(mappedBy = "board")
     @Builder.Default
     private Set<Task> tasks = new HashSet<>();
+
+    public enum BoardType {
+        KANBAN,
+        SCRUM
+    }
 
     // Helper methods
     public void addColumn(BoardColumn column) {

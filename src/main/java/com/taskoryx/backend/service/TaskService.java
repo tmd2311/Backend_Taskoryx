@@ -301,7 +301,7 @@ public class TaskService {
     @Transactional(readOnly = true)
     public List<TaskSummaryResponse> getBacklog(UUID projectId, UserPrincipal principal) {
         projectService.findProjectWithAccess(projectId, principal.getId());
-        return taskRepository.findByProjectIdAndColumnIsNullOrderByCreatedAtDesc(projectId)
+        return taskRepository.findProductBacklog(projectId)
                 .stream()
                 .map(TaskSummaryResponse::from)
                 .collect(Collectors.toList());

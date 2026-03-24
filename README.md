@@ -1,144 +1,170 @@
-# Taskoryx - Phần mền quản lí công việc
+# Taskoryx – Backend
 
-<div align="center">
+> Phần mềm quản lý công việc theo mô hình Agile/Scrum, xây dựng bằng Spring Boot + PostgreSQL.
 
-![Java](https://img.shields.io/badge/Java-17-orange?style=for-the-badge&logo=java)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.1-green?style=for-the-badge&logo=spring-boot)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue?style=for-the-badge&logo=postgresql)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
-
-**Hệ thống quản lý công việc mạnh mẽ, linh hoạt và mã nguồn mở**
-
-[🚀 Bắt đầu](#-quick-start)  • [✨ Tính năng](#-) • [🤝 Đóng góp](#đóng-góp)
-
-</div>
+![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.1-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?logo=postgresql&logoColor=white)
+![Maven](https://img.shields.io/badge/Maven-3.8-C71A36?logo=apachemaven&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-22c55e)
 
 ---
 
-##  Mục lục
+## Mục lục
 
-- [Giới thiệu](#giới-thiệu)
-- [Chức năng](#chức-năng)
-- [Tech Stack](#tech-stack)
-- [Quick Start](#quick-start)
-- [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Tổng quan](#tổng-quan)
+- [Tính năng](#tính-năng)
+- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
+- [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
+- [Cài đặt & Chạy thử](#cài-đặt--chạy-thử)
+- [Cấu trúc thư mục](#cấu-trúc-thư-mục)
+- [Cấu hình ứng dụng](#cấu-hình-ứng-dụng)
+- [Kiến trúc hệ thống](#kiến-trúc-hệ-thống)
+- [Tài liệu API](#tài-liệu-api)
 - [Đóng góp](#đóng-góp)
-- [License](#license)
-- [Liên hệ hỗ trợ](#liên-hệ-hỗ-trợ)
+- [Giấy phép](#giấy-phép)
 
 ---
 
-## Giới thiệu
+## Tổng quan
 
-**Taskoryx** là một hệ thống quản lý task hiện đại, được thiết kế để giúp các team làm việc hiệu quả hơn. Lấy cảm hứng từ Trello và Jira, Taskoryx kết hợp tính đơn giản của Kanban board với sức mạnh của project management.
+**Taskoryx** là hệ thống REST API hỗ trợ quản lý công việc theo quy trình Agile/Scrum. Backend cung cấp toàn bộ nghiệp vụ: xác thực JWT, phân quyền RBAC, Kanban board, Sprint planning, theo dõi thời gian, thông báo thời gian thực qua WebSocket.
 
-## Chức năng
+Repository này chứa phần **Backend**. Phần **Frontend** (React + TypeScript) nằm ở repository riêng.
 
-### Tính năng đã implement (v1.0)
-
-#### Chức năng gốc
--  **Quản lý User** - Đăng ký, đăng nhập, phân quyền RBAC
--  **Two-Factor Auth (2FA)** - TOTP / Google Authenticator
--  **Quản lý Project** - Tạo workspace, quản lý members
--  **Project Templates** - 4 mẫu dự án có sẵn (Software, Marketing, Design, Event)
--  **Kanban Board** - Drag & drop tasks giữa các columns (WIP limit)
--  **Task Management** - Tạo, sửa, xóa, assign, priority, deadline
--  **Backlog** - Task chưa được lên board
--  **Task Dependencies** - Phụ thuộc giữa tasks (circular detection)
--  **Checklist** - Danh sách việc nhỏ trong task (với progress %)
--  **Sprint / Milestone** - Lập kế hoạch sprint, burndown
--  **Time Tracking** - Ghi nhận giờ làm việc, tự cập nhật actualHours
--  **Comments & @Mentions** - Collaboration, gửi notification khi mention
--  **File Attachments** - Đính kèm files (max 10MB)
--  **Labels & Tags** - Phân loại tasks
--  **Activity Feed** - Lịch sử mọi thay đổi trong project
--  **Dashboard & Stats** - Thống kê theo project và cá nhân
--  **Search & Filter** - Tìm kiếm nhanh
--  **Export Excel** - Xuất danh sách task ra .xlsx (13 cột)
--  **Webhooks** - Tích hợp Slack/Discord/hệ thống ngoài
--  **WebSocket Real-time** - Kanban live update, notification real-time
-
-#### Hiệu năng và bảo mật
--  JWT Authentication (stateless)
--  Two-Factor Authentication (TOTP/HOTP)
--  Role-based Access Control (OWNER, ADMIN, MEMBER, VIEWER)
--  BCrypt password hashing
--  Database indexing & query optimization
--  Pagination & async processing
-
-### Roadmap
-
-#### Đang kế hoạch
-- 📅 **Gantt Chart** - Timeline visualization
-- 📅 **Calendar View** - Xem tasks theo lịch
-- 📅 **Automation Rules** - Tự động hóa (kéo vào Done → gửi email)
-- 📅 **Google Calendar Integration** - Đồng bộ deadline
-- 📅 **Mobile App** - iOS & Android
-- 📅 **Docker Compose** - Triển khai 1 lệnh
-
----
-
-##  Tech Stack
-
-### Backend
-- **Framework**: Spring Boot 3.2.1
-- **Language**: Java 17
-- **ORM**: Spring Data JPA (Hibernate)
-- **Database**: PostgreSQL 14+
-- **Security**: Spring Security + JWT
-- **Validation**: Jakarta Bean Validation
-- **Documentation**: Swagger/OpenAPI (Springdoc)
-- **Build Tool**: Maven
-
-### Libraries
-- **Lombok** - Reduce boilerplate code
-- **JJWT 0.12.3** - JWT implementation
-- **PostgreSQL Driver** - Database connectivity
-- **Apache POI 5.2.5** - Excel export
-- **TOTP Spring Boot Starter 1.7.1** - Two-Factor Authentication
-- **OkHttp 4.12.0** - Webhook HTTP client
-- **Spring WebSocket** - Real-time STOMP/SockJS
-
-### Tools
-- **Git** - Version control
-- **Maven** - Dependency management
-- **Docker** - Containerization (planned)
-- **GitHub Actions** - CI/CD (planned)
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Java 17+
-- PostgreSQL 14+
-- Maven 3.8+
-
-### Installation
-
-#### 1. Clone repository
-
-```bash
-git clone https://github.com/yourusername/taskoryx-backend.git
-cd taskoryx-backend
+```
+Browser (React – port 5173)
+        │  HTTP/REST + WebSocket (STOMP/SockJS)
+        ▼
+Spring Boot API (port 8080)
+        │  Spring Data JPA (Hibernate)
+        ▼
+   PostgreSQL Database (port 5432)
 ```
 
-#### 2. Setup database
+---
+
+## Tính năng
+
+### Xác thực & Phân quyền
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **JWT Authentication** | Access token 24h, Refresh token stateless, tự động cấp lại khi hết hạn |
+| **2FA (TOTP)** | Bật/tắt xác thực 2 bước, tương thích Google Authenticator |
+| **RBAC** | Phân quyền theo role dự án: `OWNER` / `MANAGER` / `DEVELOPER` / `VIEWER` |
+| **BCrypt** | Mã hóa mật khẩu, buộc đổi mật khẩu khi admin reset |
+
+### Quản lý dự án
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Dự án** | CRUD dự án, phân quyền thành viên, tìm kiếm user để mời |
+| **Template** | 4 mẫu dự án có sẵn: Software, Marketing, Design, Event |
+| **Nhãn (Label)** | Tạo nhãn màu sắc, gán cho task để phân loại |
+| **Danh mục** | Quản lý issue categories theo từng dự án |
+| **Activity Feed** | Ghi nhật ký toàn bộ thay đổi trong dự án |
+
+### Task & Board
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Bảng Kanban** | CRUD board và column, di chuyển task giữa cột, giới hạn WIP |
+| **Backlog** | Danh sách task chưa gán board; thêm vào Sprint theo yêu cầu |
+| **Sprint (Scrum)** | Tạo Sprint, giao task từ Backlog, bắt đầu / hoàn thành Sprint |
+| **Task chi tiết** | Assign, priority, deadline, estimate, checklist, attachment, time entry |
+| **Task liên kết** | Dependency: `BLOCKS` / `RELATES_TO`; phát hiện vòng tròn tự động |
+| **Gantt Chart** | API cung cấp dữ liệu timeline cho các version/milestone |
+| **Versions** | Quản lý phiên bản/milestone, theo dõi % hoàn thành |
+
+### Bình luận & @Mention
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Bình luận** | CRUD bình luận, reply lồng nhau 1 cấp |
+| **@Mention** | Parse `@username` trong nội dung comment, tự động tạo notification |
+| **Tệp đính kèm** | Upload/download/xóa file tối đa 10 MB, lưu local tại `uploads/` |
+
+### Theo dõi thời gian
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Log giờ làm** | CRUD time entry theo task và ngày; tự cập nhật `actualHours` của task |
+| **Thống kê ngày** | `GET /time-entries/stats/daily` – chi tiết từng ngày |
+| **Thống kê tuần** | `GET /time-entries/stats/weekly` – tổng hợp theo tuần |
+| **Thống kê tháng** | `GET /time-entries/stats/monthly` – 12 tháng trong năm |
+| **Tổng hợp** | `GET /time-entries/stats/summary` – overview theo dự án & ngày |
+| **Thống kê dự án** | `GET /projects/{id}/time-entries/stats` – phân tích theo thành viên & task |
+
+### Thông báo & Realtime
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **WebSocket** | STOMP over SockJS; push notification và Kanban live update |
+| **Notification** | CRUD notification, đánh dấu đọc từng cái hoặc "Đọc tất cả" |
+| **Webhook** | Tích hợp Slack/Discord/hệ thống ngoài qua HTTP (OkHttp) |
+
+### Quản trị & Tiện ích
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Admin** | Quản lý users, roles, permissions; kích hoạt/khóa tài khoản |
+| **Export Excel** | Xuất danh sách task của dự án ra file `.xlsx` (13 cột) |
+| **Dashboard** | Thống kê tổng quan cá nhân theo dự án |
+| **Search** | Tìm kiếm toàn cục tasks, projects, users |
+| **Swagger UI** | Tài liệu API tự động tại `/api/swagger-ui.html` |
+
+---
+
+## Công nghệ sử dụng
+
+| Thư viện / Framework | Phiên bản | Mục đích |
+|----------------------|-----------|----------|
+| [Spring Boot](https://spring.io/projects/spring-boot) | 3.2.1 | Application framework |
+| [Spring Security](https://spring.io/projects/spring-security) | (theo Boot) | Authentication & Authorization |
+| [Spring Data JPA](https://spring.io/projects/spring-data-jpa) | (theo Boot) | ORM / Data Access Layer |
+| [Spring WebSocket](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#websocket) | (theo Boot) | Realtime STOMP/SockJS |
+| [PostgreSQL](https://www.postgresql.org) | 14+ | Cơ sở dữ liệu quan hệ |
+| [JJWT](https://github.com/jwtk/jjwt) | 0.12.3 | JWT implementation |
+| [Lombok](https://projectlombok.org) | (theo Boot) | Giảm boilerplate code |
+| [Springdoc OpenAPI](https://springdoc.org) | 2.3.0 | Swagger UI / API docs |
+| [Apache POI](https://poi.apache.org) | 5.2.5 | Export Excel (.xlsx) |
+| [totp-spring-boot-starter](https://github.com/samdjstevens/java-totp) | 1.7.1 | Two-Factor Authentication (TOTP) |
+| [OkHttp](https://square.github.io/okhttp) | 4.12.0 | Webhook HTTP client |
+| [Jakarta Bean Validation](https://beanvalidation.org) | (theo Boot) | Validate input request |
+
+---
+
+## Yêu cầu hệ thống
+
+- **Java** >= 17
+- **Maven** >= 3.8
+- **PostgreSQL** >= 14
+
+---
+
+## Cài đặt & Chạy thử
+
+### 1. Clone repository
+
+```bash
+git clone https://github.com/<your-username>/taskoryx-be.git
+cd taskoryx-be
+```
+
+### 2. Tạo database
 
 ```bash
 # Kết nối PostgreSQL
 psql -U postgres
 
-# Tạo database
+# Tạo database và schema
 \i database-init.sql
-
-# Tạo schema
 \c taskoryx_dev
 \i schema.sql
 ```
 
-#### 3. Configure application
+### 3. Cấu hình ứng dụng
 
 Sửa file `src/main/resources/application.yaml`:
 
@@ -150,137 +176,163 @@ spring:
     password: your_password
 ```
 
-#### 4. Run application
+### 4. Chạy ứng dụng
 
 ```bash
-# Sử dụng Maven
+# Chạy trực tiếp với Maven Wrapper
 ./mvnw spring-boot:run
 
-# Hoặc build JAR
+# Hoặc build JAR rồi chạy
 ./mvnw clean package
 java -jar target/taskoryx-backend-1.0.0.jar
 ```
 
-#### 5. Verify
+### 5. Kiểm tra
 
 ```bash
-# Check health
+# Health check
 curl http://localhost:8080/api/actuator/health
 
-# Open Swagger UI
-# Browser: http://localhost:8080/api/swagger-ui.html
+# Swagger UI
+# Truy cập: http://localhost:8080/api/swagger-ui.html
 ```
 
-### Default Account
+### Tài khoản mặc định
 
 ```
-Email: admin@taskoryx.com
+Email:    admin@taskoryx.com
 Password: Admin@123
 ```
 
-
 ---
 
-##  Cấu trúc dự án
+## Cấu trúc thư mục
 
 ```
-taskoryx-backend/
-├── src/
-│   ├── main/
-│   │   ├── java/com/taskoryx/backend/
-│   │   │   ├── entity/          # JPA Entities
-│   │   │   ├── repository/      # Data Access Layer
-│   │   │   ├── service/         # Business Logic
-│   │   │   ├── controller/      # REST Controllers
-│   │   │   ├── dto/             # Data Transfer Objects
-│   │   │   ├── security/        # Security & JWT
-│   │   │   ├── exception/       # Exception Handling
-│   │   │   └── config/          # Configuration
-│   │   └── resources/
-│   │       ├── application.yaml
-│   │       ├── application-dev.yaml
-│   │       └── application-prod.yaml
-│   └── test/                    # Tests
+src/
+├── main/
+│   ├── java/com/taskoryx/backend/
+│   │   ├── TaskoryxApplication.java   # Entry point
+│   │   │
+│   │   ├── config/                    # Cấu hình Spring (Security, WebSocket, CORS, Swagger)
+│   │   ├── security/                  # JWT filter, UserDetailsService, token provider
+│   │   ├── entity/                    # JPA Entities (ánh xạ bảng database)
+│   │   ├── repository/                # Spring Data JPA repositories
+│   │   ├── dto/                       # Request / Response DTOs
+│   │   ├── service/                   # Business logic
+│   │   ├── controller/                # REST Controllers (@RestController)
+│   │   └── exception/                 # Global exception handler (@ControllerAdvice)
+│   │
+│   └── resources/
+│       ├── application.yaml           # Cấu hình chung
+│       ├── application-dev.yaml       # Cấu hình môi trường development
+│       └── application-prod.yaml      # Cấu hình môi trường production
 │
-├── database-init.sql            # DB initialization
-├── schema.sql                   # DB schema
-├── DATABASE_DESIGN.md           # Design document
-├── ERD.md                       # ER Diagram
-├── SETUP_GUIDE.md               # Setup guide
-├── pom.xml                      # Maven config
-└── README.md                    # This file
+└── test/                              # Unit & integration tests
+
+database-init.sql                      # Khởi tạo database
+schema.sql                             # Tạo toàn bộ bảng
+uploads/                               # Thư mục lưu file đính kèm
+pom.xml                                # Maven dependencies
 ```
 
 ---
+
+## Cấu hình ứng dụng
+
+Các thuộc tính quan trọng trong `application.yaml`:
+
+| Thuộc tính | Mặc định | Mô tả |
+|------------|----------|-------|
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/taskoryx_dev` | JDBC URL kết nối PostgreSQL |
+| `spring.datasource.username` | `postgres` | Username database |
+| `spring.datasource.password` | _(bắt buộc đặt)_ | Password database |
+| `app.jwt.secret` | _(bắt buộc đặt)_ | Secret key ký JWT (>= 256 bit) |
+| `app.jwt.expiration` | `86400000` | Thời hạn access token (ms) – mặc định 24h |
+| `app.jwt.refresh-expiration` | `604800000` | Thời hạn refresh token (ms) – mặc định 7 ngày |
+| `app.upload.dir` | `uploads/` | Thư mục lưu file đính kèm |
+| `server.servlet.context-path` | `/api` | Context path của toàn bộ API |
+
+---
+
+## Kiến trúc hệ thống
+
+```
+┌──────────────────────────────────────────┐
+│           REST CONTROLLERS               │
+│  AuthController · ProjectController      │
+│  TaskController · BoardController ...    │
+├──────────────────────────────────────────┤
+│             SERVICE LAYER                │
+│  Business logic, validation, mapping     │
+│  ProjectService · TaskService ...        │
+├──────────────────────────────────────────┤
+│           REPOSITORY LAYER               │
+│  Spring Data JPA repositories            │
+│  Custom JPQL / native queries            │
+├──────────────────────────────────────────┤
+│              JPA ENTITIES                │
+│  User · Project · Task · Board ...       │
+├──────────────────────────────────────────┤
+│            POSTGRESQL DATABASE           │
+│         jdbc:postgresql://localhost:5432 │
+└──────────────────────────────────────────┘
+         ▲                    ▲
+         │ JWT Filter         │ STOMP/SockJS
+   Spring Security      WebSocket Broker
+```
+
+**Nguyên tắc thiết kế:**
+
+- **Layered Architecture** – Controller → Service → Repository, mỗi tầng chỉ phụ thuộc tầng dưới
+- **DTO Pattern** – Không expose entity trực tiếp ra ngoài; dùng Request/Response DTO riêng biệt
+- **Stateless Auth** – JWT stateless, không lưu session phía server
+- **Global Exception Handling** – `@ControllerAdvice` bắt toàn bộ exception, trả về lỗi chuẩn
+- **Soft constraints** – Kiểm tra quyền ở tầng Service, không chỉ dựa vào annotation
+
+---
+
+## Tài liệu API
+
+Swagger UI tự động sinh từ annotation, truy cập sau khi chạy ứng dụng:
+
+```
+http://localhost:8080/api/swagger-ui.html
+```
+
+### Các nhóm endpoint chính
+
+| Nhóm | Prefix | Mô tả |
+|------|--------|-------|
+| Auth | `/auth` | Đăng nhập, đăng ký, refresh token, logout, 2FA |
+| User | `/users` | Profile, đổi mật khẩu, tìm kiếm user |
+| Project | `/projects` | CRUD dự án, thành viên, labels, thống kê giờ |
+| Board | `/boards`, `/columns` | Kanban board, quản lý cột, di chuyển cột |
+| Task | `/tasks`, `/projects/{id}/tasks` | CRUD task, kéo thả, lọc, tìm kiếm |
+| Comment | `/tasks/{id}/comments`, `/comments` | Bình luận, reply, @mention |
+| Attachment | `/tasks/{id}/attachments`, `/attachments` | Upload/download/xóa file |
+| Checklist | `/tasks/{id}/checklist` | CRUD checklist items |
+| Dependency | `/tasks/{id}/dependencies` | Liên kết BLOCKS / RELATES_TO |
+| Watcher | `/tasks/{id}/watchers` | Theo dõi / bỏ theo dõi task |
+| Time Entry | `/time-entries`, `/tasks/{id}/time-entries` | Log giờ, sửa, xóa, thống kê |
+| Sprint | `/projects/{id}/sprints` | CRUD sprint, bắt đầu, hoàn thành |
+| Version | `/projects/{id}/versions`, `/gantt` | Milestone, Gantt chart |
+| Category | `/projects/{id}/categories` | Danh mục issue |
+| Activity | `/projects/{id}/activity` | Nhật ký hoạt động |
+| Notification | `/notifications` | Danh sách, đánh dấu đọc, đếm chưa đọc |
+| Dashboard | `/dashboard/me` | Thống kê tổng quan cá nhân |
+| Template | `/templates/public` | Template dự án công khai |
+| Search | `/search` | Tìm kiếm toàn cục |
+| Admin | `/admin/*` | Quản trị users, roles, permissions |
+
+---
+
 ## Đóng góp
 
-Mình rất hoan nghênh mọi đóng góp! Đây là dự án mã nguồn mở.
-
-### Cách đóng góp:
-
-1. **Fork** repository này
-2. **Clone** fork của bạn
-3. **Create** một feature branch (`git checkout -b feature/AmazingFeature`)
-4. **Commit** changes (`git commit -m 'Add some AmazingFeature'`)
-5. **Push** to branch (`git push origin feature/AmazingFeature`)
-6. **Open** Pull Request
-
-### Coding Guidelines:
-
-- Follow Java code conventions
-- Write meaningful commit messages
-- Add unit tests for new features
-- Update documentation
-- Comment complex logic
-
-### Areas needing help:
-
--  Bug fixes
--  New features
--  Documentation
--  Testing
--  Translations
--  UI/UX improvements
+Xem hướng dẫn đóng góp tại [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ---
 
-##  License
+## Giấy phép
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-```
-MIT License
-
-Copyright (c) 2025 Taskoryx Team
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction...
-```
-
----
-
-## Liên hệ hỗ trợ
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/taskoryx/issues)
-- **Email**: dung.kayc@gmail.com
-
----
-
-##  Acknowledgments
-
-- Spring Boot team for the amazing framework
-- PostgreSQL community
-- All contributors to this project
-
----
-
-<div align="center">
-
-**⭐ Nếu project này hữu ích, hãy cho mình một star! ⭐**
-
-Made with ❤️ by DungTM
-
-[⬆ Back to top](#-taskoryx---task-management-system)
-
-</div>
+Dự án được phát hành dưới giấy phép **MIT**. Xem chi tiết tại [LICENSE](./LICENSE).

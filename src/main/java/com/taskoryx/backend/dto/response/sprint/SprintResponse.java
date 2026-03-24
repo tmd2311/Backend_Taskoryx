@@ -23,6 +23,8 @@ public class SprintResponse {
     private UUID id;
     private UUID projectId;
     private String projectName;
+    private UUID boardId;
+    private String boardName;
     private String name;
     private String goal;
     private Sprint.SprintStatus status;
@@ -69,6 +71,8 @@ public class SprintResponse {
                 .id(sprint.getId())
                 .projectId(sprint.getProject().getId())
                 .projectName(sprint.getProject().getName())
+                .boardId(sprint.getBoard() != null ? sprint.getBoard().getId() : null)
+                .boardName(sprint.getBoard() != null ? sprint.getBoard().getName() : null)
                 .name(sprint.getName())
                 .goal(sprint.getGoal())
                 .status(sprint.getStatus())

@@ -27,11 +27,29 @@ public class CommentResponse {
     private UUID parentId;
     private Boolean isEdited;
     private List<CommentResponse> replies;
+    /**
+     * Danh sách username đã mention (backward-compat).
+     * VD: ["dung", "nam"]
+     */
     private List<String> mentionedUsernames;
+    /**
+     * Thông tin đầy đủ của user được mention.
+     * FE dùng để render mention chip, avatar, link profile.
+     */
+    private List<MentionedUserInfo> mentionedUsers;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public static CommentResponse from(Comment comment) {
+        List<MentionedUserInfo> mentionedUsers = comment.getMentions().stream()
+                .map(m -> MentionedUserInfo.builder()
+                        .userId(m.getUser().getId())
+                        .username(m.getUser().getUsername())
+                        .fullName(m.getUser().getFullName())
+                        .avatarUrl(m.getUser().getAvatarUrl())
+                        .build())
+                .collect(Collectors.toList());
+
         return CommentResponse.builder()
                 .id(comment.getId())
                 .taskId(comment.getTask().getId())
@@ -45,9 +63,10 @@ public class CommentResponse {
                 .replies(comment.getReplies().stream()
                         .map(CommentResponse::from)
                         .collect(Collectors.toList()))
-                .mentionedUsernames(comment.getMentions().stream()
-                        .map(m -> m.getUser().getUsername())
+                .mentionedUsernames(mentionedUsers.stream()
+                        .map(MentionedUserInfo::getUsername)
                         .collect(Collectors.toList()))
+                .mentionedUsers(mentionedUsers)
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
                 .build();

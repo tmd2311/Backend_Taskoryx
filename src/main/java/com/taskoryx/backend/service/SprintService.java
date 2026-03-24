@@ -3,6 +3,8 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.dto.request.sprint.CreateSprintRequest;
 import com.taskoryx.backend.dto.request.sprint.UpdateSprintRequest;
 import com.taskoryx.backend.dto.response.sprint.SprintResponse;
+import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
+import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.Project;
 import com.taskoryx.backend.entity.ProjectMember;
 import com.taskoryx.backend.entity.Sprint;
@@ -10,6 +12,7 @@ import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ForbiddenException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
+import com.taskoryx.backend.repository.BoardRepository;
 import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.SprintRepository;
 import com.taskoryx.backend.repository.TaskRepository;
@@ -31,6 +34,7 @@ public class SprintService {
 
     private final SprintRepository sprintRepository;
     private final TaskRepository taskRepository;
+    private final BoardRepository boardRepository;
     private final ProjectService projectService;
     private final ProjectMemberRepository projectMemberRepository;
 
@@ -46,8 +50,21 @@ public class SprintService {
             }
         }
 
+        Board board = null;
+        if (request.getBoardId() != null) {
+            board = boardRepository.findById(request.getBoardId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Board", "id", request.getBoardId()));
+            if (board.getBoardType() != Board.BoardType.SCRUM) {
+                throw new BadRequestException("Board phải có loại SCRUM để gắn với sprint");
+            }
+            if (!board.getProject().getId().equals(projectId)) {
+                throw new BadRequestException("Board không thuộc dự án này");
+            }
+        }
+
         Sprint sprint = Sprint.builder()
                 .project(project)
+                .board(board)
                 .name(request.getName())
                 .goal(request.getGoal())
                 .startDate(request.getStartDate())
@@ -147,6 +164,18 @@ public class SprintService {
 
         sprint = sprintRepository.save(sprint);
         return SprintResponse.fromWithTasks(sprint);
+    }
+
+    // ========== SPRINT BACKLOG ==========
+
+    @Transactional(readOnly = true)
+    public List<TaskSummaryResponse> getSprintBacklog(UUID sprintId, UserPrincipal principal) {
+        Sprint sprint = findSprintById(sprintId);
+        projectService.findProjectWithAccess(sprint.getProject().getId(), principal.getId());
+        return sprint.getTasks().stream()
+                .filter(t -> t.getColumn() == null)
+                .map(TaskSummaryResponse::from)
+                .collect(Collectors.toList());
     }
 
     // ========== DELETE ==========

@@ -5,6 +5,7 @@ import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
 import com.taskoryx.backend.dto.request.project.UpdateMemberRoleRequest;
 import com.taskoryx.backend.dto.request.project.UpdateProjectRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
+import com.taskoryx.backend.dto.response.comment.MentionedUserInfo;
 import com.taskoryx.backend.dto.response.project.ProjectMemberResponse;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
 import com.taskoryx.backend.security.UserPrincipal;
@@ -29,10 +30,11 @@ import java.util.UUID;
  * GET    /api/projects/{id}                         - Chi tiết project
  * PUT    /api/projects/{id}                         - Cập nhật project
  * DELETE /api/projects/{id}                         - Xóa project
- * GET    /api/projects/{id}/members                 - Danh sách thành viên
- * POST   /api/projects/{id}/members                 - Thêm thành viên
- * PUT    /api/projects/{id}/members/{userId}/role   - Cập nhật vai trò
- * DELETE /api/projects/{id}/members/{userId}        - Xóa thành viên
+ * GET    /api/projects/{id}/members                        - Danh sách thành viên
+ * GET    /api/projects/{id}/members/search?keyword=       - Tìm thành viên cho @mention
+ * POST   /api/projects/{id}/members                       - Thêm thành viên
+ * PUT    /api/projects/{id}/members/{userId}/role         - Cập nhật vai trò
+ * DELETE /api/projects/{id}/members/{userId}              - Xóa thành viên
  */
 @RestController
 @RequestMapping("/projects")
@@ -94,6 +96,18 @@ public class ProjectController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(projectService.getMembers(id, principal)));
+    }
+
+    @GetMapping("/{id}/members/search")
+    @Operation(summary = "Tìm kiếm thành viên để @mention",
+               description = "Trả về thành viên trong project khớp keyword. " +
+                             "Dùng cho autocomplete khi gõ @ trong comment.")
+    public ResponseEntity<ApiResponse<List<MentionedUserInfo>>> searchMembersForMention(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "") String keyword,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                projectService.searchMembersForMention(id, keyword, principal)));
     }
 
     @PostMapping("/{id}/members")

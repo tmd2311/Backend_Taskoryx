@@ -25,4 +25,14 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, UU
            "WHERE pm.project.id = :projectId AND pm.user.id = :userId")
     Optional<ProjectMember.ProjectRole> findRoleByProjectIdAndUserId(
             @Param("projectId") UUID projectId, @Param("userId") UUID userId);
+
+    /** Tìm kiếm thành viên trong project theo username/fullName/email */
+    @Query("SELECT pm FROM ProjectMember pm JOIN FETCH pm.user u " +
+           "WHERE pm.project.id = :projectId " +
+           "AND (LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "  OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "  OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<ProjectMember> searchMembersByKeyword(
+            @Param("projectId") UUID projectId,
+            @Param("keyword") String keyword);
 }

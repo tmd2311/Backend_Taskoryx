@@ -5,6 +5,7 @@ import com.taskoryx.backend.dto.request.sprint.SprintTaskRequest;
 import com.taskoryx.backend.dto.request.sprint.UpdateSprintRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
 import com.taskoryx.backend.dto.response.sprint.SprintResponse;
+import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.security.UserPrincipal;
 import com.taskoryx.backend.service.SprintService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +32,7 @@ import java.util.UUID;
  * DELETE /api/sprints/{id}                     - Xóa sprint (chỉ PLANNED)
  * POST   /api/sprints/{id}/tasks               - Thêm task vào sprint
  * DELETE /api/sprints/{id}/tasks/{taskId}      - Xóa task khỏi sprint
+ * GET    /api/sprints/{id}/backlog             - Tasks trong sprint chưa kéo lên board (Sprint Backlog)
  */
 @RestController
 @RequiredArgsConstructor
@@ -123,5 +125,14 @@ public class SprintController {
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success("Xóa task khỏi sprint thành công",
                 sprintService.removeTaskFromSprint(id, taskId, principal)));
+    }
+
+    @GetMapping("/sprints/{id}/backlog")
+    @Operation(summary = "Lấy Sprint Backlog - tasks trong sprint chưa được kéo lên board")
+    public ResponseEntity<ApiResponse<List<TaskSummaryResponse>>> getSprintBacklog(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                sprintService.getSprintBacklog(id, principal)));
     }
 }
