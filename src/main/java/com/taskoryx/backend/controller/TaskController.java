@@ -125,4 +125,12 @@ public class TaskController {
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(taskService.getMyTasks(principal)));
     }
+
+    @GetMapping("/tasks/key/{taskKey}")
+    @Operation(summary = "Lấy chi tiết task theo taskKey (VD: PROJ-123)")
+    public ResponseEntity<ApiResponse<TaskResponse>> getTaskByKey(
+            @PathVariable String taskKey,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(taskService.getTaskByKey(taskKey, principal)));
+    }
 }

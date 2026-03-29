@@ -11,9 +11,6 @@ import com.taskoryx.backend.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -119,11 +116,12 @@ public class AdminController {
     // ===================== USERS =====================
 
     @GetMapping("/users")
-    @Operation(summary = "Lấy danh sách tất cả người dùng")
+    @Operation(summary = "Lấy danh sách tất cả người dùng (hỗ trợ tìm kiếm)")
     public ResponseEntity<ApiResponse<PagedResponse<AdminUserResponse>>> getAllUsers(
+            @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        var result = adminService.getAllUsers(PageRequest.of(page, size));
+        var result = adminService.getAllUsers(keyword, PageRequest.of(page, size));
         return ResponseEntity.ok(ApiResponse.success(PagedResponse.of(result)));
     }
 
@@ -151,12 +149,10 @@ public class AdminController {
     }
 
     @PostMapping("/users/{id}/reset-password")
-    @Operation(summary = "Reset mật khẩu tạm thời cho user")
-    public ResponseEntity<ApiResponse<Void>> resetPassword(
-            @PathVariable UUID id,
-            @Valid @RequestBody ResetPasswordRequest request) {
-        adminService.resetUserPassword(id, request.getNewPassword());
-        return ResponseEntity.ok(ApiResponse.success("Reset mật khẩu thành công"));
+    @Operation(summary = "Đặt lại mật khẩu ngẫu nhiên và gửi qua email cho user")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@PathVariable UUID id) {
+        adminService.resetUserPassword(id);
+        return ResponseEntity.ok(ApiResponse.success("Mật khẩu mới đã được gửi về email người dùng"));
     }
 
     @PostMapping("/users/{id}/roles")
@@ -178,12 +174,4 @@ public class AdminController {
                 adminService.removeRoleFromUser(id, roleId)));
     }
 
-    // ===================== INNER DTO =====================
-
-    @Data
-    static class ResetPasswordRequest {
-        @NotBlank(message = "Mật khẩu không được để trống")
-        @Size(min = 8, message = "Mật khẩu tối thiểu 8 ký tự")
-        private String newPassword;
-    }
 }

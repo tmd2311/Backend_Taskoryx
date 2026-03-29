@@ -149,6 +149,25 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
+    public TaskResponse getTaskByKey(String taskKey, UserPrincipal principal) {
+        int dashIndex = taskKey.lastIndexOf('-');
+        if (dashIndex < 0) {
+            throw new ResourceNotFoundException("Task", "taskKey", taskKey);
+        }
+        String projectKey = taskKey.substring(0, dashIndex);
+        int taskNumber;
+        try {
+            taskNumber = Integer.parseInt(taskKey.substring(dashIndex + 1));
+        } catch (NumberFormatException e) {
+            throw new ResourceNotFoundException("Task", "taskKey", taskKey);
+        }
+        Task task = taskRepository.findByProjectKeyAndTaskNumber(projectKey, taskNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Task", "taskKey", taskKey));
+        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        return TaskResponse.from(task);
+    }
+
+    @Transactional(readOnly = true)
     public Page<TaskSummaryResponse> getTasksByProject(UUID projectId, TaskFilterRequest filter,
                                                         UserPrincipal principal) {
         projectService.findProjectWithAccess(projectId, principal.getId());

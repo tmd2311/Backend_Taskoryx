@@ -148,8 +148,9 @@ public class AdminService {
     // ===================== USER MANAGEMENT =====================
 
     @Transactional(readOnly = true)
-    public Page<AdminUserResponse> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable).map(AdminUserResponse::from);
+    public Page<AdminUserResponse> getAllUsers(String keyword, Pageable pageable) {
+        return userRepository.findAllUsers(keyword == null ? "" : keyword, pageable)
+                .map(AdminUserResponse::from);
     }
 
     @Transactional(readOnly = true)
@@ -206,11 +207,13 @@ public class AdminService {
     }
 
     @Transactional
-    public void resetUserPassword(UUID userId, String newPassword) {
+    public void resetUserPassword(UUID userId) {
         User user = findUserById(userId);
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        String tempPassword = generateTemporaryPassword();
+        user.setPasswordHash(passwordEncoder.encode(tempPassword));
         user.setMustChangePassword(true);
         userRepository.save(user);
+        emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), tempPassword);
         log.info("Password reset for user: {}", user.getEmail());
     }
 

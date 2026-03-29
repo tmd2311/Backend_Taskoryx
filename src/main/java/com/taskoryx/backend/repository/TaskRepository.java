@@ -79,4 +79,8 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
 
     @Query("SELECT t FROM Task t WHERE t.assignee.id = :userId AND t.dueDate < :today AND t.completedAt IS NULL")
     List<Task> findOverdueTasksByAssigneeId(@Param("userId") UUID userId, @Param("today") LocalDate today);
+
+    @Query("SELECT t FROM Task t WHERE t.project.key = :projectKey AND t.taskNumber = :taskNumber")
+    Optional<Task> findByProjectKeyAndTaskNumber(@Param("projectKey") String projectKey,
+                                                  @Param("taskNumber") Integer taskNumber);
 }

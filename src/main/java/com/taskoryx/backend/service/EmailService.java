@@ -29,6 +29,41 @@ public class EmailService {
     private String frontendUrl;
 
     /**
+     * Gửi email thông báo mật khẩu mới khi admin đặt lại mật khẩu.
+     * Chạy async để không block luồng chính.
+     */
+    @Async
+    public void sendPasswordResetEmail(String toEmail, String fullName, String newPassword) {
+        try {
+            Context ctx = new Context();
+            ctx.setVariable("fullName", fullName);
+            ctx.setVariable("email", toEmail);
+            ctx.setVariable("newPassword", newPassword);
+            ctx.setVariable("loginUrl", frontendUrl + "/login");
+            ctx.setVariable("supportEmail", fromEmail);
+            ctx.setVariable("year", Year.now().getValue());
+
+            String htmlContent = templateEngine.process("email/reset-password", ctx);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, "Taskoryx");
+            helper.setTo(toEmail);
+            helper.setSubject("Taskoryx – Mật khẩu của bạn đã được đặt lại");
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Password reset email sent to: {}", toEmail);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
+        } catch (Exception e) {
+            log.error("Unexpected error sending password reset email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    /**
      * Gửi email chào mừng kèm mật khẩu tạm thời khi admin tạo user mới.
      * Chạy async để không block luồng chính.
      */
