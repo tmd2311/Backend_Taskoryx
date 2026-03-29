@@ -25,6 +25,7 @@ public class UserResponse {
     private String language;
     private Boolean emailVerified;
     private Boolean isActive;
+    private Boolean mustChangePassword;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
 
@@ -40,6 +41,7 @@ public class UserResponse {
                 .language(user.getLanguage())
                 .emailVerified(user.getEmailVerified())
                 .isActive(user.getIsActive())
+                .mustChangePassword(user.getMustChangePassword())
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
                 .build();

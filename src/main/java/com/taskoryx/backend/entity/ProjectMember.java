@@ -42,7 +42,7 @@ public class ProjectMember {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "varchar(20)")
     private ProjectRole role;
 
     @CreationTimestamp
@@ -53,10 +53,11 @@ public class ProjectMember {
      * Enum for project roles
      */
     public enum ProjectRole {
-        OWNER,   // Full access, can delete project
-        ADMIN,   // Manage members and settings
-        MEMBER,  // Create and edit tasks
-        VIEWER   // Read-only access
+        OWNER,     // Full access, can delete project
+        ADMIN,     // Manage members and settings
+        MEMBER,    // Create and edit tasks
+        DEVELOPER, // Developer role (alias for MEMBER-level access)
+        VIEWER     // Read-only access
     }
 
     @Override

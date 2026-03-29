@@ -32,6 +32,11 @@ public class Attachment {
     @JoinColumn(name = "task_id", nullable = false, foreignKey = @ForeignKey(name = "fk_attachments_task"))
     private Task task;
 
+    /** Nullable — nếu file được đính kèm trong một comment cụ thể */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "comment_id", nullable = true, foreignKey = @ForeignKey(name = "fk_attachments_comment"))
+    private Comment comment;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "uploaded_by", nullable = false, foreignKey = @ForeignKey(name = "fk_attachments_user"))
     private User uploadedBy;
@@ -79,6 +84,14 @@ public class Attachment {
     @Transient
     public boolean isImage() {
         return fileType != null && fileType.startsWith("image/");
+    }
+
+    /**
+     * Get file category based on MIME type
+     */
+    @Transient
+    public FileCategory getFileCategory() {
+        return FileCategory.fromMimeType(fileType);
     }
 
     @Override
