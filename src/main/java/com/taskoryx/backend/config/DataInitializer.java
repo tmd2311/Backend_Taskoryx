@@ -80,6 +80,7 @@ public class DataInitializer implements ApplicationRunner {
         log.info("Initializing system data...");
         Map<String, Permission> permissions = initPermissions();
         Role adminRole = initAdminRole(permissions);
+        initPmRole(permissions);
         initDefaultAdminUser(adminRole);
         log.info("System data initialization complete.");
     }
@@ -116,34 +117,63 @@ public class DataInitializer implements ApplicationRunner {
         });
     }
 
-    private void initDefaultAdminUser(Role adminRole) {
-        // Chỉ tạo nếu chưa có user nào có role ADMIN
-        boolean adminExists = userRoleRepository.findAll().stream()
-                .anyMatch(ur -> ur.getRole().getName().equals("ADMIN"));
-
-        if (!adminExists) {
-            User adminUser = User.builder()
-                    .username("admin")
-                    .email("admin@taskoryx.com")
-                    .passwordHash(passwordEncoder.encode("Admin@123456"))
-                    .fullName("System Administrator")
-                    .isActive(true)
-                    .emailVerified(true)
+    private void initPmRole(Map<String, Permission> permissions) {
+        roleRepository.findByName("PM").orElseGet(() -> {
+            Set<Permission> pmPermissions = new HashSet<>();
+            List<String> pmPermissionNames = List.of(
+                "PROJECT_VIEW", "PROJECT_UPDATE", "PROJECT_MANAGE_MEMBERS",
+                "BOARD_VIEW", "BOARD_CREATE", "BOARD_UPDATE", "BOARD_DELETE",
+                "TASK_VIEW", "TASK_CREATE", "TASK_UPDATE", "TASK_DELETE", "TASK_ASSIGN",
+                "COMMENT_CREATE", "COMMENT_DELETE",
+                "REPORT_VIEW"
+            );
+            for (String name : pmPermissionNames) {
+                if (permissions.containsKey(name)) {
+                    pmPermissions.add(permissions.get(name));
+                }
+            }
+            Role pmRole = Role.builder()
+                    .name("PM")
+                    .description("Project Manager - Quản lý dự án")
+                    .isSystemRole(true)
+                    .permissions(pmPermissions)
                     .build();
-            userRepository.save(adminUser);
+            Role saved = roleRepository.save(pmRole);
+            log.info("PM role created with {} permissions", saved.getPermissions().size());
+            return saved;
+        });
+    }
 
-            UserRole userRole = UserRole.builder()
+    private void initDefaultAdminUser(Role adminRole) {
+        User adminUser = userRepository.findByEmail("admin@taskoryx.com")
+                .orElseGet(() -> {
+                    User u = User.builder()
+                            .username("admin")
+                            .email("admin@taskoryx.com")
+                            .passwordHash(passwordEncoder.encode("Admin@123456"))
+                            .fullName("System Administrator")
+                            .isActive(true)
+                            .emailVerified(true)
+                            .build();
+                    userRepository.save(u);
+                    log.warn("========================================");
+                    log.warn("Default admin created!");
+                    log.warn("Email   : admin@taskoryx.com");
+                    log.warn("Password: Admin@123456");
+                    log.warn("PLEASE CHANGE PASSWORD AFTER FIRST LOGIN");
+                    log.warn("========================================");
+                    return u;
+                });
+
+        // Gán ADMIN role nếu chưa có
+        boolean hasAdminRole = userRoleRepository.findAll().stream()
+                .anyMatch(ur -> ur.getUser().getId().equals(adminUser.getId())
+                        && ur.getRole().getName().equals("ADMIN"));
+        if (!hasAdminRole) {
+            userRoleRepository.save(UserRole.builder()
                     .user(adminUser)
                     .role(adminRole)
-                    .build();
-            userRoleRepository.save(userRole);
-
-            log.warn("========================================");
-            log.warn("Default admin created!");
-            log.warn("Email   : admin@taskoryx.com");
-            log.warn("Password: Admin@123456");
-            log.warn("PLEASE CHANGE PASSWORD AFTER FIRST LOGIN");
-            log.warn("========================================");
+                    .build());
         }
     }
 

@@ -21,7 +21,7 @@ public class ProjectMemberResponse {
     private String email;
     private String fullName;
     private String avatarUrl;
-    private ProjectMember.ProjectRole role;
+    private String role;
     private LocalDateTime joinedAt;
 
     public static ProjectMemberResponse from(ProjectMember member) {

@@ -110,7 +110,7 @@ public class VersionService {
         boolean isOwner = project.getOwner().getId().equals(userId);
         boolean isAdmin = project.getMembers().stream()
                 .filter(m -> m.getUser().getId().equals(userId))
-                .anyMatch(m -> m.getRole() == ProjectMember.ProjectRole.ADMIN);
+                .anyMatch(m -> "ADMIN".equals(m.getRole()));
         if (!isOwner && !isAdmin) {
             throw new BadRequestException("Chỉ OWNER hoặc ADMIN mới có thể thực hiện thao tác này");
         }

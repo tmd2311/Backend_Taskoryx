@@ -1,7 +1,6 @@
 package com.taskoryx.backend.dto.response.project;
 
 import com.taskoryx.backend.entity.Project;
-import com.taskoryx.backend.entity.ProjectMember;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,7 +27,7 @@ public class ProjectResponse {
     private UUID ownerId;
     private int memberCount;
     private int taskCount;
-    private ProjectMember.ProjectRole currentUserRole;
+    private String currentUserRole;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

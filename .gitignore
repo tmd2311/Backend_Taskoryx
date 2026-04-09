@@ -58,3 +58,6 @@ doc/
 *.pem
 *.key
 *.crt
+
+/.claude
+CLAUDE.md

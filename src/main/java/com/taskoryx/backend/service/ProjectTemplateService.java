@@ -82,7 +82,7 @@ public class ProjectTemplateService {
         ProjectMember ownerMember = ProjectMember.builder()
                 .project(project)
                 .user(owner)
-                .role(ProjectMember.ProjectRole.OWNER)
+                .role("OWNER")
                 .build();
         projectMemberRepository.save(ownerMember);
 
@@ -120,7 +120,7 @@ public class ProjectTemplateService {
         }
 
         ProjectResponse response = ProjectResponse.from(project);
-        response.setCurrentUserRole(ProjectMember.ProjectRole.OWNER);
+        response.setCurrentUserRole("OWNER");
         return response;
     }
 

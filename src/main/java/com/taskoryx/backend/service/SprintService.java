@@ -229,10 +229,10 @@ public class SprintService {
     }
 
     private void requireAdminOrOwner(UUID projectId, UUID userId) {
-        ProjectMember.ProjectRole role = projectMemberRepository
+        String role = projectMemberRepository
                 .findRoleByProjectIdAndUserId(projectId, userId)
                 .orElseThrow(() -> new ForbiddenException("Bạn không phải thành viên của dự án này"));
-        if (role != ProjectMember.ProjectRole.OWNER && role != ProjectMember.ProjectRole.ADMIN) {
+        if (!"OWNER".equals(role) && !"ADMIN".equals(role)) {
             throw new ForbiddenException("Bạn cần quyền ADMIN hoặc OWNER để thực hiện thao tác này");
         }
     }

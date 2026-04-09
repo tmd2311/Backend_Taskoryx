@@ -23,7 +23,7 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, UU
 
     @Query("SELECT pm.role FROM ProjectMember pm " +
            "WHERE pm.project.id = :projectId AND pm.user.id = :userId")
-    Optional<ProjectMember.ProjectRole> findRoleByProjectIdAndUserId(
+    Optional<String> findRoleByProjectIdAndUserId(
             @Param("projectId") UUID projectId, @Param("userId") UUID userId);
 
     /** Tìm kiếm thành viên trong project theo username/fullName/email */

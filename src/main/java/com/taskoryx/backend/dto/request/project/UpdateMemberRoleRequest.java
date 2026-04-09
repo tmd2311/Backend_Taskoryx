@@ -1,12 +1,13 @@
 package com.taskoryx.backend.dto.request.project;
 
-import com.taskoryx.backend.entity.ProjectMember;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class UpdateMemberRoleRequest {
 
-    @NotNull(message = "Vai trò không được để trống")
-    private ProjectMember.ProjectRole role;
+    @NotBlank(message = "Vai trò không được để trống")
+    @Size(max = 50, message = "Tên vai trò tối đa 50 ký tự")
+    private String role;
 }

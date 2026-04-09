@@ -78,7 +78,7 @@ public class ProjectService {
         ProjectMember ownerMember = ProjectMember.builder()
                 .project(project)
                 .user(owner)
-                .role(ProjectMember.ProjectRole.OWNER)
+                .role("OWNER")
                 .build();
         projectMemberRepository.save(ownerMember);
 
@@ -86,7 +86,7 @@ public class ProjectService {
         createDefaultBoard(project);
 
         ProjectResponse response = ProjectResponse.from(project);
-        response.setCurrentUserRole(ProjectMember.ProjectRole.OWNER);
+        response.setCurrentUserRole("OWNER");
         return response;
     }
 
@@ -173,10 +173,24 @@ public class ProjectService {
             throw new BadRequestException("Người dùng này đã là thành viên của dự án");
         }
 
+        // Nếu user có system role → tự động gán project role tương ứng (ưu tiên role không phải ADMIN)
+        String systemRole = newMember.getUserRoles().stream()
+                .map(ur -> ur.getRole().getName())
+                .filter(name -> !"ADMIN".equals(name))
+                .findFirst()
+                .orElse(newMember.getUserRoles().stream()
+                        .map(ur -> ur.getRole().getName())
+                        .findFirst()
+                        .orElse(null));
+        String projectRole = systemRole != null ? systemRole : request.getRole();
+        if (projectRole == null || projectRole.isBlank()) {
+            throw new BadRequestException("Vui lòng chỉ định vai trò cho thành viên");
+        }
+
         ProjectMember member = ProjectMember.builder()
                 .project(project)
                 .user(newMember)
-                .role(request.getRole())
+                .role(projectRole)
                 .build();
         return ProjectMemberResponse.from(projectMemberRepository.save(member));
     }
@@ -188,7 +202,7 @@ public class ProjectService {
         requireAdminOrOwner(projectId, principal.getId());
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong dự án"));
-        if (member.getRole() == ProjectMember.ProjectRole.OWNER) {
+        if ("OWNER".equals(member.getRole())) {
             throw new ForbiddenException("Không thể thay đổi vai trò của chủ sở hữu");
         }
         member.setRole(request.getRole());
@@ -200,7 +214,7 @@ public class ProjectService {
         requireAdminOrOwner(projectId, principal.getId());
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong dự án"));
-        if (member.getRole() == ProjectMember.ProjectRole.OWNER) {
+        if ("OWNER".equals(member.getRole())) {
             throw new ForbiddenException("Không thể xóa chủ sở hữu khỏi dự án");
         }
         projectMemberRepository.delete(member);
@@ -220,10 +234,10 @@ public class ProjectService {
     }
 
     private void requireAdminOrOwner(UUID projectId, UUID userId) {
-        ProjectMember.ProjectRole role = projectMemberRepository
+        String role = projectMemberRepository
                 .findRoleByProjectIdAndUserId(projectId, userId)
                 .orElseThrow(() -> new ForbiddenException("Bạn không phải thành viên của dự án này"));
-        if (role != ProjectMember.ProjectRole.OWNER && role != ProjectMember.ProjectRole.ADMIN) {
+        if (!"OWNER".equals(role) && !"ADMIN".equals(role)) {
             throw new ForbiddenException("Bạn cần quyền ADMIN hoặc OWNER để thực hiện thao tác này");
         }
     }

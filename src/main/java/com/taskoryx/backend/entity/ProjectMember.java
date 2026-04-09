@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+// Roles là chuỗi tự do, admin tự định nghĩa. Hai giá trị đặc biệt: "OWNER", "ADMIN".
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -41,24 +43,12 @@ public class ProjectMember {
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_project_members_user"))
     private User user;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "varchar(20)")
-    private ProjectRole role;
+    @Column(nullable = false, length = 50)
+    private String role;
 
     @CreationTimestamp
     @Column(name = "joined_at", nullable = false, updatable = false)
     private LocalDateTime joinedAt;
-
-    /**
-     * Enum for project roles
-     */
-    public enum ProjectRole {
-        OWNER,     // Full access, can delete project
-        ADMIN,     // Manage members and settings
-        MEMBER,    // Create and edit tasks
-        DEVELOPER, // Developer role (alias for MEMBER-level access)
-        VIEWER     // Read-only access
-    }
 
     @Override
     public boolean equals(Object o) {

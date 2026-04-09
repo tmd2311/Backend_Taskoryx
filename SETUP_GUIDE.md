@@ -1,7 +1,10 @@
-# 🚀 Taskoryx Backend - Hướng dẫn Setup
+# 🚀 Taskoryx – Hướng dẫn Triển khai (Backend + Frontend)
+
+> Cập nhật: 2026-03-24
 
 ## 📚 Mục lục
 
+**Backend**
 1. [Giới thiệu](#giới-thiệu)
 2. [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
 3. [Cài đặt Database](#cài-đặt-database)
@@ -13,6 +16,14 @@
 9. [API Documentation](#api-documentation)
 10. [Testing](#testing)
 
+**Frontend**
+11. [Yêu cầu & Cài đặt Frontend](#11-yêu-cầu--cài-đặt-frontend)
+12. [Cấu hình môi trường FE](#12-cấu-hình-môi-trường-fe)
+13. [Cấu hình Axios & Auth](#13-cấu-hình-axios--auth)
+14. [Tích hợp WebSocket](#14-tích-hợp-websocket)
+15. [Tích hợp Time Tracking & Thống kê](#15-tích-hợp-time-tracking--thống-kê)
+16. [Troubleshooting chung](#16-troubleshooting-chung)
+
 ---
 
 ## 🎯 Giới thiệu
@@ -23,7 +34,10 @@ Taskoryx là hệ thống quản lý task (Task Management System) giống như 
 - **Database**: PostgreSQL 14+
 - **ORM**: Spring Data JPA (Hibernate)
 - **Security**: Spring Security + JWT
-- **Documentation**: Swagger/OpenAPI
+- **Documentation**: Swagger/OpenAPI 2.3.0
+- **Real-time**: STOMP WebSocket (SockJS)
+- **Email**: Spring Mail + Thymeleaf templates
+- **2FA**: TOTP (Google Authenticator compatible)
 
 ---
 
@@ -641,6 +655,458 @@ Nếu gặp vấn đề, vui lòng:
 2. Xem [Documentation](#api-documentation)
 3. Tạo issue trên GitHub
 4. Liên hệ team
+
+---
+
+**Happy Coding! 🚀**
+
+---
+
+# Frontend Deployment Guide
+
+---
+
+## 11. Yêu cầu & Cài đặt Frontend
+
+### Yêu cầu
+- **Node.js**: 18+ (LTS)
+- **npm**: 9+ hoặc **yarn** 1.22+
+- **Backend** đang chạy ở `http://localhost:8080`
+
+### Kiểm tra phiên bản
+```bash
+node -v    # v18.x.x trở lên
+npm -v     # 9.x.x trở lên
+```
+
+### Tạo project React (nếu chưa có)
+```bash
+# Vite + React (khuyên dùng)
+npm create vite@latest taskoryx-fe -- --template react
+cd taskoryx-fe
+npm install
+
+# Hoặc Next.js
+npx create-next-app@latest taskoryx-fe
+```
+
+### Cài đặt thư viện cần thiết
+```bash
+# HTTP client
+npm install axios
+
+# WebSocket (real-time)
+npm install @stomp/stompjs sockjs-client
+
+# Biểu đồ thống kê
+npm install recharts
+
+# UI (tùy chọn – dùng 1 trong các thư viện sau)
+npm install @shadcn/ui        # shadcn/ui
+npm install antd               # Ant Design
+npm install @mui/material      # Material UI
+
+# Quản lý state (tùy chọn)
+npm install zustand            # Zustand (nhẹ, đơn giản)
+npm install @tanstack/react-query  # React Query (server state)
+
+# Date handling
+npm install dayjs
+```
+
+---
+
+## 12. Cấu hình môi trường FE
+
+Tạo file `.env` (Vite) hoặc `.env.local` (Next.js):
+
+```env
+# Vite
+VITE_API_URL=http://localhost:8080/api
+VITE_WS_URL=http://localhost:8080/api/ws
+
+# Next.js
+NEXT_PUBLIC_API_URL=http://localhost:8080/api
+NEXT_PUBLIC_WS_URL=http://localhost:8080/api/ws
+```
+
+> Khi deploy production, thay `localhost:8080` bằng domain thực tế.
+
+---
+
+## 13. Cấu hình Axios & Auth
+
+### File `src/api/axios.js`
+```js
+import axios from 'axios'
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,   // hoặc process.env.NEXT_PUBLIC_API_URL
+  headers: { 'Content-Type': 'application/json' },
+})
+
+// Tự động gắn accessToken
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+// Tự động refresh khi hết hạn (401)
+let isRefreshing = false
+let queue = []
+
+api.interceptors.response.use(
+  (res) => res.data,   // unwrap: trả về { success, data, message }
+  async (err) => {
+    const original = err.config
+    if (err.response?.status === 401 && !original._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          queue.push({ resolve, reject })
+        }).then((token) => {
+          original.headers.Authorization = `Bearer ${token}`
+          return api(original)
+        })
+      }
+      original._retry = true
+      isRefreshing = true
+      try {
+        const refreshToken = localStorage.getItem('refreshToken')
+        const { data } = await axios.post(
+          `${import.meta.env.VITE_API_URL}/auth/refresh`,
+          { refreshToken }
+        )
+        localStorage.setItem('accessToken', data.accessToken)
+        queue.forEach(({ resolve }) => resolve(data.accessToken))
+        queue = []
+        original.headers.Authorization = `Bearer ${data.accessToken}`
+        return api(original)
+      } catch {
+        queue.forEach(({ reject }) => reject())
+        queue = []
+        localStorage.clear()
+        window.location.href = '/login'
+      } finally {
+        isRefreshing = false
+      }
+    }
+    // Lấy message lỗi từ backend
+    const message = err.response?.data?.message || 'Đã có lỗi xảy ra'
+    return Promise.reject(new Error(message))
+  }
+)
+
+export default api
+```
+
+### Sử dụng API
+```js
+// Đăng nhập
+const login = async (email, password) => {
+  const result = await api.post('/auth/login', { email, password })
+  // result = { success, data: { accessToken, refreshToken, user } }
+  localStorage.setItem('accessToken', result.data.accessToken)
+  localStorage.setItem('refreshToken', result.data.refreshToken)
+  return result.data.user
+}
+
+// Lấy task
+const getTask = async (taskId) => {
+  const result = await api.get(`/tasks/${taskId}`)
+  return result.data  // TaskResponse
+}
+```
+
+---
+
+## 14. Tích hợp WebSocket
+
+### File `src/hooks/useWebSocket.js`
+```js
+import { useEffect, useRef } from 'react'
+import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
+
+export function useWebSocket({ projectId, onNotification, onProjectUpdate }) {
+  const clientRef = useRef(null)
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    const client = new Client({
+      webSocketFactory: () =>
+        new SockJS(import.meta.env.VITE_WS_URL),
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      reconnectDelay: 5000,
+      onConnect: () => {
+        // Thông báo cá nhân
+        client.subscribe('/user/queue/notifications', (msg) => {
+          onNotification?.(JSON.parse(msg.body))
+        })
+        // Cập nhật real-time project
+        if (projectId) {
+          client.subscribe(`/topic/project/${projectId}`, (msg) => {
+            onProjectUpdate?.(JSON.parse(msg.body))
+          })
+        }
+      },
+    })
+
+    client.activate()
+    clientRef.current = client
+
+    return () => client.deactivate()
+  }, [projectId])
+
+  return clientRef
+}
+```
+
+### Sử dụng trong component
+```jsx
+function KanbanBoard({ projectId }) {
+  const [tasks, setTasks] = useState([])
+
+  useWebSocket({
+    projectId,
+    onNotification: (notif) => toast.info(notif.message),
+    onProjectUpdate: (event) => {
+      // Refresh khi có thay đổi (task tạo mới, move, update...)
+      if (['TASK_CREATED', 'TASK_UPDATED', 'TASK_MOVED'].includes(event.type)) {
+        fetchTasks()
+      }
+    },
+  })
+  // ...
+}
+```
+
+---
+
+## 15. Tích hợp Time Tracking & Thống kê
+
+### API calls
+
+```js
+// src/api/timeTracking.js
+import api from './axios'
+
+// --- Ghi nhận giờ ---
+export const logTime = (data) => api.post('/time-entries', data)
+// data: { taskId, hours, description, workDate }
+
+export const updateTimeEntry = (id, data) => api.put(`/time-entries/${id}`, data)
+export const deleteTimeEntry = (id) => api.delete(`/time-entries/${id}`)
+export const getTaskTimeEntries = (taskId) => api.get(`/tasks/${taskId}/time-entries`)
+
+// --- Thống kê ---
+export const getDailyStats = (start, end) =>
+  api.get('/time-entries/stats/daily', { params: { start, end } })
+
+export const getWeeklyStats = (start, end) =>
+  api.get('/time-entries/stats/weekly', { params: { start, end } })
+
+export const getMonthlyStats = (year) =>
+  api.get('/time-entries/stats/monthly', { params: { year } })
+
+export const getSummaryStats = (start, end) =>
+  api.get('/time-entries/stats/summary', { params: { start, end } })
+
+export const getProjectStats = (projectId, start, end) =>
+  api.get(`/projects/${projectId}/time-entries/stats`, { params: { start, end } })
+```
+
+### Component biểu đồ ngày (Recharts)
+
+```jsx
+// src/components/TimeTracking/DailyHoursChart.jsx
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
+
+export function DailyHoursChart({ data }) {
+  // data = DailyTimeStatsResponse[]
+  const chartData = data.map(d => ({
+    label: d.date.slice(5),        // "03-24"
+    hours: Number(d.totalHours),
+    count: d.entryCount,
+  }))
+
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+        <YAxis unit="h" tick={{ fontSize: 12 }} />
+        <Tooltip
+          formatter={(v, _name, props) => [
+            `${v}h (${props.payload.count} entries)`,
+            'Giờ làm',
+          ]}
+        />
+        <Bar dataKey="hours" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+```
+
+### Trang báo cáo thời gian
+
+```jsx
+// src/pages/TimeReportPage.jsx
+import { useState, useEffect } from 'react'
+import dayjs from 'dayjs'
+import { getSummaryStats, getMonthlyStats } from '../api/timeTracking'
+import { DailyHoursChart } from '../components/TimeTracking/DailyHoursChart'
+
+export default function TimeReportPage() {
+  const [tab, setTab] = useState('summary')  // 'summary' | 'monthly' | 'project'
+  const [summary, setSummary] = useState(null)
+  const [monthly, setMonthly] = useState([])
+  const [year, setYear] = useState(dayjs().year())
+  const [range, setRange] = useState({
+    start: dayjs().startOf('month').format('YYYY-MM-DD'),
+    end: dayjs().format('YYYY-MM-DD'),
+  })
+
+  useEffect(() => {
+    if (tab === 'summary') {
+      getSummaryStats(range.start, range.end)
+        .then(r => setSummary(r.data))
+    } else if (tab === 'monthly') {
+      getMonthlyStats(year).then(r => setMonthly(r.data))
+    }
+  }, [tab, range, year])
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Báo cáo thời gian</h1>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6">
+        {['summary', 'monthly', 'project'].map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 rounded ${tab === t ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+          >
+            {{ summary: 'Tổng hợp', monthly: 'Theo tháng', project: 'Theo project' }[t]}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'summary' && summary && (
+        <div>
+          {/* Cards tổng hợp */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <StatCard label="Tổng giờ" value={summary.formattedTotalHours} />
+            <StatCard label="Ngày có log" value={`${summary.activeDays} ngày`} />
+            <StatCard label="TB/ngày active" value={`${summary.avgHoursPerActiveDay}h`} />
+            <StatCard label="Số entries" value={summary.totalEntries} />
+          </div>
+
+          {/* Biểu đồ ngày */}
+          <div className="bg-white rounded-lg p-4 shadow mb-6">
+            <h3 className="font-semibold mb-3">Giờ làm theo ngày</h3>
+            <DailyHoursChart data={summary.byDay} />
+          </div>
+
+          {/* Breakdown theo project */}
+          <div className="bg-white rounded-lg p-4 shadow">
+            <h3 className="font-semibold mb-3">Theo project</h3>
+            {summary.byProject.map(p => (
+              <div key={p.projectId} className="flex items-center gap-3 mb-2">
+                <span className="font-mono text-sm bg-gray-100 px-2 py-0.5 rounded">
+                  {p.projectKey}
+                </span>
+                <span className="flex-1">{p.projectName}</span>
+                <span className="font-semibold">{p.formattedHours}</span>
+                <div className="w-32 h-2 bg-gray-100 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded"
+                    style={{
+                      width: `${(p.totalHours / summary.totalHours) * 100}%`
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'monthly' && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <label>Năm:</label>
+            <input
+              type="number"
+              value={year}
+              onChange={e => setYear(Number(e.target.value))}
+              className="border rounded px-2 py-1 w-24"
+            />
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            {monthly.map(m => (
+              <div key={m.month} className="bg-white rounded-lg p-4 shadow">
+                <div className="text-sm text-gray-500">{m.monthName}</div>
+                <div className="text-xl font-bold">{m.formattedHours}</div>
+                <div className="text-sm text-gray-400">
+                  {m.activeDays} ngày • {m.entryCount} entries
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatCard({ label, value }) {
+  return (
+    <div className="bg-white rounded-lg p-4 shadow">
+      <div className="text-sm text-gray-500">{label}</div>
+      <div className="text-2xl font-bold mt-1">{value}</div>
+    </div>
+  )
+}
+```
+
+---
+
+## 16. Troubleshooting chung
+
+### Backend
+
+| Lỗi | Nguyên nhân | Giải pháp |
+|-----|------------|-----------|
+| `Connection refused` | PostgreSQL chưa chạy | `pg_ctl start` hoặc kiểm tra service |
+| `Table already exists` | `ddl-auto: create` chạy lại | Đổi sang `validate` |
+| `Lombok not working` | Chưa bật annotation processing | IDE → Enable AP |
+| Port 8080 occupied | Port bị chiếm | `lsof -i :8080` rồi kill hoặc đổi port |
+
+### Frontend
+
+| Lỗi | Nguyên nhân | Giải pháp |
+|-----|------------|-----------|
+| CORS blocked | BE chưa allow origin FE | Kiểm tra `SecurityConfig.corsConfigurationSource()` |
+| 401 liên tục | Token hết hạn & refresh thất bại | Kiểm tra `refreshToken` còn hạn (7 ngày) |
+| WebSocket disconnect | Token hết hạn | Reconnect với token mới sau refresh |
+| `data is undefined` | Quên unwrap response | API trả `{ success, data }` – phải lấy `result.data` |
+| VITE env không đọc được | Thiếu prefix `VITE_` | Đổi thành `VITE_API_URL=...` |
+
+### CORS – Whitelist thêm origin FE
+
+Nếu FE chạy ở port khác (VD: 5173 – Vite mặc định), thêm vào `SecurityConfig.java`:
+```java
+config.setAllowedOrigins(List.of(
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://your-production-domain.com"
+));
+```
 
 ---
 
