@@ -48,6 +48,10 @@ public class BoardColumn {
     @Builder.Default
     private Boolean isCompleted = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mapped_status", length = 20)
+    private Task.TaskStatus mappedStatus;
+
     @Column(name = "task_limit")
     private Integer taskLimit;
 

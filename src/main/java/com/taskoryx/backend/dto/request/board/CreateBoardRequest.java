@@ -1,5 +1,6 @@
 package com.taskoryx.backend.dto.request.board;
 
+import com.taskoryx.backend.entity.Board;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -12,4 +13,7 @@ public class CreateBoardRequest {
     private String name;
 
     private String description;
+
+    /** KANBAN (mặc định) hoặc PERSONAL (board cá nhân) */
+    private Board.BoardType boardType;
 }

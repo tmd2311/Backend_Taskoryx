@@ -49,6 +49,10 @@ public class Board {
     @Builder.Default
     private BoardType boardType = BoardType.KANBAN;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", foreignKey = @ForeignKey(name = "fk_boards_owner"))
+    private User owner;
+
     @Column(name = "is_default", nullable = false)
     @Builder.Default
     private Boolean isDefault = false;
@@ -73,7 +77,9 @@ public class Board {
 
     public enum BoardType {
         KANBAN,
-        SCRUM
+        SCRUM,
+        SPRINT,
+        PERSONAL
     }
 
     // Helper methods

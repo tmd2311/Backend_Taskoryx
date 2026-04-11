@@ -299,6 +299,11 @@ public class TaskService {
         task.setColumn(targetColumn);
         task.setPosition(request.getNewPosition());
 
+        // Nếu cột có mappedStatus → tự động set trạng thái task
+        if (targetColumn.getMappedStatus() != null) {
+            task.setStatus(targetColumn.getMappedStatus());
+        }
+
         // Đánh dấu hoàn thành nếu chuyển vào cột đã hoàn thành
         if (targetColumn.getIsCompleted() && task.getCompletedAt() == null) {
             task.setCompletedAt(LocalDateTime.now());

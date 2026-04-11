@@ -5,6 +5,7 @@ import com.taskoryx.backend.dto.request.sprint.UpdateSprintRequest;
 import com.taskoryx.backend.dto.response.sprint.SprintResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.Board;
+import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.Project;
 import com.taskoryx.backend.entity.ProjectMember;
 import com.taskoryx.backend.entity.Sprint;
@@ -12,6 +13,7 @@ import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ForbiddenException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
+import com.taskoryx.backend.repository.BoardColumnRepository;
 import com.taskoryx.backend.repository.BoardRepository;
 import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.SprintRepository;
@@ -35,6 +37,7 @@ public class SprintService {
     private final SprintRepository sprintRepository;
     private final TaskRepository taskRepository;
     private final BoardRepository boardRepository;
+    private final BoardColumnRepository boardColumnRepository;
     private final ProjectService projectService;
     private final ProjectMemberRepository projectMemberRepository;
 
@@ -50,21 +53,21 @@ public class SprintService {
             }
         }
 
-        Board board = null;
-        if (request.getBoardId() != null) {
-            board = boardRepository.findById(request.getBoardId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Board", "id", request.getBoardId()));
-            if (board.getBoardType() != Board.BoardType.SCRUM) {
-                throw new BadRequestException("Board phải có loại SCRUM để gắn với sprint");
-            }
-            if (!board.getProject().getId().equals(projectId)) {
-                throw new BadRequestException("Board không thuộc dự án này");
-            }
-        }
+        // Tự động tạo sprint board với các cột theo trạng thái task
+        int maxPos = boardRepository.findMaxPositionByProjectId(projectId).orElse(-1);
+        Board sprintBoard = Board.builder()
+                .project(project)
+                .name(request.getName())
+                .boardType(Board.BoardType.SPRINT)
+                .position(maxPos + 1)
+                .isDefault(false)
+                .build();
+        sprintBoard = boardRepository.save(sprintBoard);
+        createStatusColumns(sprintBoard);
 
         Sprint sprint = Sprint.builder()
                 .project(project)
-                .board(board)
+                .board(sprintBoard)
                 .name(request.getName())
                 .goal(request.getGoal())
                 .startDate(request.getStartDate())
@@ -74,6 +77,30 @@ public class SprintService {
 
         sprint = sprintRepository.save(sprint);
         return SprintResponse.fromWithTasks(sprint);
+    }
+
+    /** Tạo 6 cột chuẩn theo TaskStatus cho sprint board */
+    private void createStatusColumns(Board board) {
+        record ColDef(String name, String color, Task.TaskStatus status, boolean completed) {}
+        List<ColDef> defs = List.of(
+            new ColDef("To Do",      "#6B7280", Task.TaskStatus.TODO,        false),
+            new ColDef("In Progress","#3B82F6", Task.TaskStatus.IN_PROGRESS, false),
+            new ColDef("In Review",  "#F59E0B", Task.TaskStatus.IN_REVIEW,   false),
+            new ColDef("Resolved",   "#8B5CF6", Task.TaskStatus.RESOLVED,    false),
+            new ColDef("Done",       "#10B981", Task.TaskStatus.DONE,        true),
+            new ColDef("Cancelled",  "#EF4444", Task.TaskStatus.CANCELLED,   false)
+        );
+        for (int i = 0; i < defs.size(); i++) {
+            ColDef d = defs.get(i);
+            boardColumnRepository.save(BoardColumn.builder()
+                    .board(board)
+                    .name(d.name())
+                    .color(d.color())
+                    .mappedStatus(d.status())
+                    .isCompleted(d.completed())
+                    .position(i)
+                    .build());
+        }
     }
 
     // ========== READ ==========
@@ -107,6 +134,11 @@ public class SprintService {
 
         if (request.getName() != null && !request.getName().isBlank()) {
             sprint.setName(request.getName());
+            // Đồng bộ tên board với tên sprint
+            if (sprint.getBoard() != null && sprint.getBoard().getBoardType() == Board.BoardType.SPRINT) {
+                sprint.getBoard().setName(request.getName());
+                boardRepository.save(sprint.getBoard());
+            }
         }
         if (request.getGoal() != null) {
             sprint.setGoal(request.getGoal());
@@ -186,6 +218,15 @@ public class SprintService {
 
         if (sprint.getStatus() != Sprint.SprintStatus.PLANNED) {
             throw new BadRequestException("Chỉ có thể xóa sprint đang ở trạng thái PLANNED");
+        }
+
+        // Xóa sprint board đi kèm
+        Board board = sprint.getBoard();
+        sprint.setBoard(null);
+        sprintRepository.save(sprint);
+
+        if (board != null && board.getBoardType() == Board.BoardType.SPRINT) {
+            boardRepository.delete(board);
         }
 
         sprintRepository.delete(sprint);

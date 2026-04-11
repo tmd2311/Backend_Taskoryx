@@ -1,6 +1,7 @@
 package com.taskoryx.backend.dto.response.board;
 
 import com.taskoryx.backend.entity.BoardColumn;
+import com.taskoryx.backend.entity.Task;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,6 +21,7 @@ public class BoardColumnResponse {
     private Integer position;
     private String color;
     private Boolean isCompleted;
+    private Task.TaskStatus mappedStatus;
     private Integer taskLimit;
     private int taskCount;
     private LocalDateTime createdAt;
@@ -31,6 +33,7 @@ public class BoardColumnResponse {
                 .position(column.getPosition())
                 .color(column.getColor())
                 .isCompleted(column.getIsCompleted())
+                .mappedStatus(column.getMappedStatus())
                 .taskLimit(column.getTaskLimit())
                 .taskCount(column.getTasks().size())
                 .createdAt(column.getCreatedAt())

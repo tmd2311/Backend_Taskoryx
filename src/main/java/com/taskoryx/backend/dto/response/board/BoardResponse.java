@@ -22,7 +22,10 @@ public class BoardResponse {
     private String name;
     private String description;
     private Integer position;
+    private Board.BoardType boardType;
     private Boolean isDefault;
+    private UUID ownerId;
+    private String ownerName;
     private List<BoardColumnResponse> columns;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -34,7 +37,10 @@ public class BoardResponse {
                 .name(board.getName())
                 .description(board.getDescription())
                 .position(board.getPosition())
+                .boardType(board.getBoardType())
                 .isDefault(board.getIsDefault())
+                .ownerId(board.getOwner() != null ? board.getOwner().getId() : null)
+                .ownerName(board.getOwner() != null ? board.getOwner().getFullName() : null)
                 .columns(board.getColumns().stream()
                         .map(BoardColumnResponse::from)
                         .collect(Collectors.toList()))
