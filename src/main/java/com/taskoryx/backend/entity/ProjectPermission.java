@@ -31,6 +31,7 @@ public final class ProjectPermission {
     public static final String VERSION_MANAGE = "VERSION_MANAGE";
     public static final String MEMBER_MANAGE = "MEMBER_MANAGE";
     public static final String REPORT_VIEW = "REPORT_VIEW";
+    public static final String PERFORMANCE_CALCULATE = "PERFORMANCE_CALCULATE";
     public static final String WEBHOOK_MANAGE = "WEBHOOK_MANAGE";
 
     public static final Set<String> ALL = Set.of(
@@ -38,7 +39,7 @@ public final class ProjectPermission {
             COMMENT_CREATE, COMMENT_DELETE,
             ATTACHMENT_MANAGE, TIME_TRACKING_VIEW, TIME_TRACKING_MANAGE, LABEL_MANAGE, CATEGORY_MANAGE,
             BOARD_VIEW, BOARD_UPDATE,
-            SPRINT_MANAGE, VERSION_MANAGE, MEMBER_MANAGE, REPORT_VIEW, WEBHOOK_MANAGE
+            SPRINT_MANAGE, VERSION_MANAGE, MEMBER_MANAGE, REPORT_VIEW, PERFORMANCE_CALCULATE, WEBHOOK_MANAGE
     );
 
     private ProjectPermission() {}

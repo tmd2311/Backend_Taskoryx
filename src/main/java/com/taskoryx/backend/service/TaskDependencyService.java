@@ -1,6 +1,7 @@
 package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.dto.request.task.AddDependencyRequest;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.dto.response.task.TaskDependencyResponse;
 import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.entity.TaskDependency;
@@ -22,7 +23,7 @@ public class TaskDependencyService {
 
     private final TaskDependencyRepository dependencyRepository;
     private final TaskRepository taskRepository;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     @Transactional(readOnly = true)
     public List<TaskDependencyResponse> getDependencies(UUID taskId, UserPrincipal principal) {
@@ -35,6 +36,8 @@ public class TaskDependencyService {
     @Transactional
     public TaskDependencyResponse addDependency(UUID taskId, AddDependencyRequest request, UserPrincipal principal) {
         Task task = getTaskWithAccess(taskId, principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_UPDATE);
         UUID dependsOnTaskId = request.getDependsOnTaskId();
 
         // Không cho phép task phụ thuộc vào chính nó
@@ -74,7 +77,9 @@ public class TaskDependencyService {
 
     @Transactional
     public void removeDependency(UUID taskId, UUID dependencyId, UserPrincipal principal) {
-        getTaskWithAccess(taskId, principal.getId());
+        Task task = getTaskWithAccess(taskId, principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_UPDATE);
 
         TaskDependency dependency = dependencyRepository.findById(dependencyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Dependency", "id", dependencyId));
@@ -126,8 +131,7 @@ public class TaskDependencyService {
     private Task getTaskWithAccess(UUID taskId, UUID userId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        // Kiểm tra user có quyền truy cập project của task không
-        projectService.findProjectWithAccess(task.getProject().getId(), userId);
+        projectAuthorizationService.requirePermission(task.getProject().getId(), userId, ProjectPermission.TASK_VIEW);
         return task;
     }
 }

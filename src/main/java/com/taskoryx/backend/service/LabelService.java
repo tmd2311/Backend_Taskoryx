@@ -35,7 +35,7 @@ public class LabelService {
 
     @Transactional
     public LabelResponse createLabel(UUID projectId, CreateLabelRequest request, UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_UPDATE);
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.LABEL_MANAGE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         if (labelRepository.existsByProjectIdAndName(projectId, request.getName())) {
@@ -56,7 +56,7 @@ public class LabelService {
         Label label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Label", "id", labelId));
         projectAuthorizationService.requirePermission(label.getProject().getId(), principal.getId(),
-                ProjectPermission.TASK_UPDATE);
+                ProjectPermission.LABEL_MANAGE);
         labelRepository.delete(label);
     }
 }

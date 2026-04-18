@@ -3,6 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.dto.response.user.UserResponse;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.repository.ProjectRepository;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.repository.UserRepository;
@@ -27,6 +28,7 @@ public class SearchService {
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     @Transactional(readOnly = true)
     public GlobalSearchResult search(String keyword, UserPrincipal principal) {
@@ -52,8 +54,7 @@ public class SearchService {
     @Transactional(readOnly = true)
     public List<TaskSummaryResponse> searchTasksInProject(String keyword, java.util.UUID projectId,
                                                            UserPrincipal principal) {
-        projectRepository.findById(projectId)
-                .orElseThrow(() -> new com.taskoryx.backend.exception.ResourceNotFoundException("Project", "id", projectId));
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
 
         PageRequest pageable = PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "updatedAt"));
         return taskRepository.searchByProjectId(projectId, keyword, pageable)

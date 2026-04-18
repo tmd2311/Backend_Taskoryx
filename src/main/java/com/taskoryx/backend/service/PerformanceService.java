@@ -59,7 +59,8 @@ public class PerformanceService {
      */
     @Transactional
     public List<UserPerformanceResponse> calculateProjectPerformance(UUID projectId, UserPrincipal principal) {
-        projectAuthorizationService.requireProjectAdmin(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(),
+                ProjectPermission.PERFORMANCE_CALCULATE);
         Project project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);

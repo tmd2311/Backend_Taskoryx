@@ -25,12 +25,14 @@ import java.util.stream.Collectors;
 public class IssueCategoryService {
 
     private final IssueCategoryRepository categoryRepository;
+    private final ProjectService projectService;
     private final ProjectAuthorizationService projectAuthorizationService;
     private final UserRepository userRepository;
 
     @Transactional
     public CategoryResponse createCategory(UUID projectId, CreateCategoryRequest request, UserPrincipal principal) {
-        Project project = projectAuthorizationService.requireProjectAdmin(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.CATEGORY_MANAGE);
+        Project project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         if (categoryRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new BadRequestException("Danh mục '" + request.getName() + "' đã tồn tại trong project này");
@@ -62,8 +64,9 @@ public class IssueCategoryService {
     @Transactional
     public CategoryResponse updateCategory(UUID categoryId, UpdateCategoryRequest request, UserPrincipal principal) {
         IssueCategory category = findCategoryById(categoryId);
-        Project project = projectAuthorizationService.requireProjectAdmin(category.getProject().getId(),
-                principal.getId());
+        projectAuthorizationService.requirePermission(category.getProject().getId(), principal.getId(),
+                ProjectPermission.CATEGORY_MANAGE);
+        Project project = projectService.findProjectWithAccess(category.getProject().getId(), principal.getId());
 
         if (request.getName() != null && !request.getName().equals(category.getName())) {
             if (categoryRepository.existsByProjectIdAndName(project.getId(), request.getName())) {
@@ -86,7 +89,8 @@ public class IssueCategoryService {
     @Transactional
     public void deleteCategory(UUID categoryId, UserPrincipal principal) {
         IssueCategory category = findCategoryById(categoryId);
-        projectAuthorizationService.requireProjectAdmin(category.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(category.getProject().getId(), principal.getId(),
+                ProjectPermission.CATEGORY_MANAGE);
 
         if (!category.getTasks().isEmpty()) {
             throw new BadRequestException("Không thể xóa danh mục đang có task. Hãy gỡ task khỏi danh mục trước.");
