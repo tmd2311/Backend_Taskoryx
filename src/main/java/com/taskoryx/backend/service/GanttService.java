@@ -1,6 +1,7 @@
 package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.dto.response.gantt.GanttTaskItem;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +18,11 @@ import java.util.stream.Collectors;
 public class GanttService {
 
     private final TaskRepository taskRepository;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     @Transactional(readOnly = true)
     public List<GanttTaskItem> getGanttData(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
 
         // Get all tasks with dates, filter those with at least startDate or dueDate
         return taskRepository.findByProjectId(projectId, PageRequest.of(0, 1000))

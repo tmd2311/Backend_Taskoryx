@@ -18,7 +18,6 @@ import java.util.Map;
 @Slf4j
 public class WebSocketController {
 
-    // Client joins a project room (for real-time kanban updates)
     @MessageMapping("/project.join")
     @SendTo("/topic/project/{projectId}")
     public Map<String, Object> joinProject(Map<String, String> payload, Principal principal) {
@@ -30,7 +29,6 @@ public class WebSocketController {
         );
     }
 
-    // Client sends a ping to keep connection alive
     @MessageMapping("/ping")
     @SendToUser("/queue/pong")
     public Map<String, Object> ping(Principal principal) {

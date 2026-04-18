@@ -5,6 +5,7 @@ import com.taskoryx.backend.dto.request.webhook.CreateWebhookRequest;
 import com.taskoryx.backend.dto.request.webhook.UpdateWebhookRequest;
 import com.taskoryx.backend.dto.response.webhook.WebhookResponse;
 import com.taskoryx.backend.entity.Project;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.entity.Webhook;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
@@ -34,7 +35,7 @@ public class WebhookService {
     private final WebhookRepository webhookRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
     private final ObjectMapper objectMapper;
 
     private static final okhttp3.MediaType JSON = okhttp3.MediaType.get("application/json; charset=utf-8");
@@ -47,7 +48,7 @@ public class WebhookService {
 
     @Transactional
     public WebhookResponse createWebhook(UUID projectId, CreateWebhookRequest request, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.WEBHOOK_MANAGE);
 
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
@@ -71,7 +72,7 @@ public class WebhookService {
 
     @Transactional(readOnly = true)
     public List<WebhookResponse> getProjectWebhooks(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.WEBHOOK_MANAGE);
         return webhookRepository.findByProjectId(projectId).stream()
                 .map(WebhookResponse::from)
                 .collect(Collectors.toList());
@@ -81,7 +82,8 @@ public class WebhookService {
     public WebhookResponse updateWebhook(UUID webhookId, UpdateWebhookRequest request, UserPrincipal principal) {
         Webhook webhook = webhookRepository.findById(webhookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Webhook", "id", webhookId));
-        projectService.findProjectWithAccess(webhook.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(webhook.getProject().getId(), principal.getId(),
+                ProjectPermission.WEBHOOK_MANAGE);
 
         if (request.getName() != null) webhook.setName(request.getName());
         if (request.getUrl() != null) webhook.setUrl(request.getUrl());
@@ -96,7 +98,8 @@ public class WebhookService {
     public void deleteWebhook(UUID webhookId, UserPrincipal principal) {
         Webhook webhook = webhookRepository.findById(webhookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Webhook", "id", webhookId));
-        projectService.findProjectWithAccess(webhook.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(webhook.getProject().getId(), principal.getId(),
+                ProjectPermission.WEBHOOK_MANAGE);
         webhookRepository.delete(webhook);
     }
 
@@ -152,7 +155,8 @@ public class WebhookService {
     public WebhookResponse testWebhook(UUID webhookId, UserPrincipal principal) {
         Webhook webhook = webhookRepository.findById(webhookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Webhook", "id", webhookId));
-        projectService.findProjectWithAccess(webhook.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(webhook.getProject().getId(), principal.getId(),
+                ProjectPermission.WEBHOOK_MANAGE);
         deliverWebhook(webhook, "PING", Map.of("message", "Test delivery from Taskoryx"));
         return WebhookResponse.from(webhookRepository.findById(webhookId).orElseThrow());
     }

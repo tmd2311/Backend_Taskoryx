@@ -10,8 +10,6 @@ import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.*;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
-import com.taskoryx.backend.entity.IssueCategory;
-import com.taskoryx.backend.entity.Version;
 import com.taskoryx.backend.repository.*;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -35,9 +33,11 @@ public class TaskService {
     private final BoardRepository boardRepository;
     private final BoardColumnRepository boardColumnRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
     private final LabelRepository labelRepository;
     private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
     private final NotificationService notificationService;
     private final VersionRepository versionRepository;
     private final IssueCategoryRepository issueCategoryRepository;
@@ -45,32 +45,33 @@ public class TaskService {
 
     @Transactional
     public TaskResponse createTask(UUID projectId, CreateTaskRequest request, UserPrincipal principal) {
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_CREATE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         Board board = null;
         BoardColumn column = null;
 
         if (request.getBoardId() != null) {
-            board = boardRepository.findById(request.getBoardId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Board", "id", request.getBoardId()));
+            board = findBoardInProject(projectId, request.getBoardId());
         }
 
         if (request.getColumnId() != null) {
-            column = boardColumnRepository.findById(request.getColumnId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Column", "id", request.getColumnId()));
+            column = findColumnInProject(projectId, request.getColumnId());
         }
 
         // Nếu có columnId thì phải có boardId
         if (column != null && board == null) {
             throw new BadRequestException("Phải cung cấp boardId khi chỉ định columnId");
         }
+        if (board != null && column != null && !column.getBoard().getId().equals(board.getId())) {
+            throw new BadRequestException("Cột được chọn không thuộc board đã chỉ định");
+        }
 
         User reporter = userRepository.findById(principal.getId()).orElseThrow();
 
         User assignee = null;
         if (request.getAssigneeId() != null) {
-            assignee = userRepository.findById(request.getAssigneeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getAssigneeId()));
+            assignee = findMemberUserInProject(projectId, request.getAssigneeId(), "assignee");
         }
 
         // Lấy task number tiếp theo
@@ -85,14 +86,12 @@ public class TaskService {
 
         Version version = null;
         if (request.getVersionId() != null) {
-            version = versionRepository.findById(request.getVersionId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Version", "id", request.getVersionId()));
+            version = findVersionInProject(projectId, request.getVersionId());
         }
 
         IssueCategory category = null;
         if (request.getCategoryId() != null) {
-            category = issueCategoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("IssueCategory", "id", request.getCategoryId()));
+            category = findCategoryInProject(projectId, request.getCategoryId());
         }
 
         Task parentTask = null;
@@ -144,7 +143,8 @@ public class TaskService {
     public TaskResponse getTask(UUID taskId, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_VIEW);
         return TaskResponse.from(task);
     }
 
@@ -163,14 +163,15 @@ public class TaskService {
         }
         Task task = taskRepository.findByProjectKeyAndTaskNumber(projectKey, taskNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "taskKey", taskKey));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_VIEW);
         return TaskResponse.from(task);
     }
 
     @Transactional(readOnly = true)
     public Page<TaskSummaryResponse> getTasksByProject(UUID projectId, TaskFilterRequest filter,
                                                         UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
         Sort sort = Sort.by(filter.getSortDir().equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC : Sort.Direction.DESC, filter.getSortBy());
         PageRequest pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
@@ -186,7 +187,8 @@ public class TaskService {
     public TaskResponse updateTask(UUID taskId, UpdateTaskRequest request, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_UPDATE);
 
         if (request.getTitle() != null) task.setTitle(request.getTitle());
         if (request.getDescription() != null) task.setDescription(request.getDescription());
@@ -198,8 +200,7 @@ public class TaskService {
         if (request.getActualHours() != null) task.setActualHours(request.getActualHours());
 
         if (request.getAssigneeId() != null) {
-            User assignee = userRepository.findById(request.getAssigneeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getAssigneeId()));
+            User assignee = findMemberUserInProject(task.getProject().getId(), request.getAssigneeId(), "assignee");
             boolean newAssignee = task.getAssignee() == null ||
                     !task.getAssignee().getId().equals(request.getAssigneeId());
             task.setAssignee(assignee);
@@ -219,8 +220,7 @@ public class TaskService {
         if (request.isClearVersion()) {
             task.setVersion(null);
         } else if (request.getVersionId() != null) {
-            Version ver = versionRepository.findById(request.getVersionId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Version", "id", request.getVersionId()));
+            Version ver = findVersionInProject(task.getProject().getId(), request.getVersionId());
             task.setVersion(ver);
         }
 
@@ -228,8 +228,7 @@ public class TaskService {
         if (request.isClearCategory()) {
             task.setCategory(null);
         } else if (request.getCategoryId() != null) {
-            IssueCategory cat = issueCategoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("IssueCategory", "id", request.getCategoryId()));
+            IssueCategory cat = findCategoryInProject(task.getProject().getId(), request.getCategoryId());
             task.setCategory(cat);
         }
 
@@ -267,7 +266,8 @@ public class TaskService {
     public TaskResponse moveTask(UUID taskId, MoveTaskRequest request, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_UPDATE);
 
         // targetColumnId = null → chuyển về Backlog
         if (request.getTargetColumnId() == null) {
@@ -280,6 +280,9 @@ public class TaskService {
 
         BoardColumn targetColumn = boardColumnRepository.findById(request.getTargetColumnId())
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", request.getTargetColumnId()));
+        if (!targetColumn.getBoard().getProject().getId().equals(task.getProject().getId())) {
+            throw new BadRequestException("Không thể chuyển task sang cột của dự án khác");
+        }
 
         // Kiểm tra WIP limit
         if (targetColumn.getTaskLimit() != null) {
@@ -291,11 +294,7 @@ public class TaskService {
             }
         }
 
-        // Nếu task đang ở backlog và chuyển vào board, cần set board
-        if (task.getBoard() == null) {
-            task.setBoard(targetColumn.getBoard());
-        }
-
+        task.setBoard(targetColumn.getBoard());
         task.setColumn(targetColumn);
         task.setPosition(request.getNewPosition());
 
@@ -318,13 +317,14 @@ public class TaskService {
     public void deleteTask(UUID taskId, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_DELETE);
         taskRepository.delete(task);
     }
 
     @Transactional(readOnly = true)
     public List<TaskSummaryResponse> getBacklog(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
         return taskRepository.findProductBacklog(projectId)
                 .stream()
                 .map(TaskSummaryResponse::from)
@@ -343,7 +343,8 @@ public class TaskService {
     public TaskResponse updateTaskStatus(UUID taskId, UpdateTaskStatusRequest request, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_UPDATE);
         applyStatus(task, request.getStatus());
         return TaskResponse.from(taskRepository.save(task));
     }
@@ -366,5 +367,50 @@ public class TaskService {
     private void assignLabels(Task task, List<UUID> labelIds) {
         // Labels are handled through TaskLabel entity - simplified here
         // Full implementation would save TaskLabel entities
+    }
+
+    private Board findBoardInProject(UUID projectId, UUID boardId) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
+        if (!board.getProject().getId().equals(projectId)) {
+            throw new BadRequestException("Board không thuộc dự án hiện tại");
+        }
+        return board;
+    }
+
+    private BoardColumn findColumnInProject(UUID projectId, UUID columnId) {
+        BoardColumn column = boardColumnRepository.findById(columnId)
+                .orElseThrow(() -> new ResourceNotFoundException("Column", "id", columnId));
+        if (!column.getBoard().getProject().getId().equals(projectId)) {
+            throw new BadRequestException("Cột không thuộc dự án hiện tại");
+        }
+        return column;
+    }
+
+    private Version findVersionInProject(UUID projectId, UUID versionId) {
+        Version version = versionRepository.findById(versionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Version", "id", versionId));
+        if (!version.getProject().getId().equals(projectId)) {
+            throw new BadRequestException("Version không thuộc dự án hiện tại");
+        }
+        return version;
+    }
+
+    private IssueCategory findCategoryInProject(UUID projectId, UUID categoryId) {
+        IssueCategory category = issueCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("IssueCategory", "id", categoryId));
+        if (!category.getProject().getId().equals(projectId)) {
+            throw new BadRequestException("Category không thuộc dự án hiện tại");
+        }
+        return category;
+    }
+
+    private User findMemberUserInProject(UUID projectId, UUID userId, String fieldName) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        if (!projectMemberRepository.existsByProjectIdAndUserId(projectId, userId)) {
+            throw new BadRequestException("Người dùng được chọn cho " + fieldName + " không thuộc dự án hiện tại");
+        }
+        return user;
     }
 }

@@ -7,7 +7,6 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -21,19 +20,27 @@ public class ProjectTemplateResponse {
     private String category;
     private String icon;
     private String color;
-    private List<Map<String, Object>> columnsConfig;
+    private TemplateConfigDto config;
     private boolean isPublic;
     private LocalDateTime createdAt;
 
     public static ProjectTemplateResponse from(ProjectTemplate template) {
-        List<Map<String, Object>> columns = null;
+        TemplateConfigDto config = null;
         if (template.getColumnsConfig() != null) {
+            ObjectMapper mapper = new ObjectMapper();
             try {
-                ObjectMapper mapper = new ObjectMapper();
-                columns = mapper.readValue(template.getColumnsConfig(),
-                    new TypeReference<List<Map<String, Object>>>() {});
+                // Try new full-config format first
+                config = mapper.readValue(template.getColumnsConfig(), TemplateConfigDto.class);
             } catch (Exception e) {
-                columns = List.of();
+                try {
+                    // Fallback: old format was a plain array of columns
+                    List<TemplateColumnConfigDto> cols = mapper.readValue(
+                            template.getColumnsConfig(),
+                            new TypeReference<List<TemplateColumnConfigDto>>() {});
+                    config = TemplateConfigDto.builder().columns(cols).build();
+                } catch (Exception e2) {
+                    config = TemplateConfigDto.builder().build();
+                }
             }
         }
         return ProjectTemplateResponse.builder()
@@ -43,7 +50,7 @@ public class ProjectTemplateResponse {
                 .category(template.getCategory())
                 .icon(template.getIcon())
                 .color(template.getColor())
-                .columnsConfig(columns)
+                .config(config)
                 .isPublic(template.isPublic())
                 .createdAt(template.getCreatedAt())
                 .build();

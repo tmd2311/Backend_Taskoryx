@@ -3,6 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.dto.request.timetracking.CreateTimeEntryRequest;
 import com.taskoryx.backend.dto.request.timetracking.UpdateTimeEntryRequest;
 import com.taskoryx.backend.dto.response.timetracking.*;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.entity.TimeTracking;
 import com.taskoryx.backend.entity.User;
@@ -37,7 +38,7 @@ public class TimeTrackingService {
 
     private final TimeTrackingRepository timeTrackingRepository;
     private final TaskRepository taskRepository;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
 
@@ -46,8 +47,8 @@ public class TimeTrackingService {
         Task task = taskRepository.findById(request.getTaskId())
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", request.getTaskId()));
 
-        // Kiểm tra quyền truy cập vào project
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TIME_TRACKING_MANAGE);
 
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", principal.getId()));
@@ -75,8 +76,8 @@ public class TimeTrackingService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
-        // Kiểm tra quyền truy cập vào project
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TIME_TRACKING_VIEW);
 
         return timeTrackingRepository.findByTaskId(taskId)
                 .stream()
@@ -94,8 +95,10 @@ public class TimeTrackingService {
     @Transactional(readOnly = true)
     public List<TimeTrackingResponse> getTimeEntriesByDateRange(UUID userId, LocalDate start, LocalDate end,
                                                                  UserPrincipal principal) {
-        // Chỉ được xem của mình hoặc admin có thể xem của người khác
         UUID targetUserId = userId != null ? userId : principal.getId();
+        if (!targetUserId.equals(principal.getId())) {
+            throw new ForbiddenException("Bạn chỉ có thể xem dữ liệu time tracking của chính mình");
+        }
 
         return timeTrackingRepository.findByUserIdAndWorkDateBetween(targetUserId, start, end)
                 .stream()
@@ -108,6 +111,8 @@ public class TimeTrackingService {
                                                  UserPrincipal principal) {
         TimeTracking entry = timeTrackingRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("TimeTracking", "id", entryId));
+        projectAuthorizationService.requirePermission(entry.getTask().getProject().getId(), principal.getId(),
+                ProjectPermission.TIME_TRACKING_MANAGE);
 
         // Chỉ người tạo entry mới được sửa
         if (!entry.getUser().getId().equals(principal.getId())) {
@@ -136,6 +141,8 @@ public class TimeTrackingService {
     public void deleteTimeEntry(UUID entryId, UserPrincipal principal) {
         TimeTracking entry = timeTrackingRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("TimeTracking", "id", entryId));
+        projectAuthorizationService.requirePermission(entry.getTask().getProject().getId(), principal.getId(),
+                ProjectPermission.TIME_TRACKING_MANAGE);
 
         // Chỉ người tạo entry mới được xóa
         if (!entry.getUser().getId().equals(principal.getId())) {
@@ -154,7 +161,8 @@ public class TimeTrackingService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TIME_TRACKING_VIEW);
 
         return timeTrackingRepository.sumHoursByTaskId(taskId)
                 .orElse(BigDecimal.ZERO);
@@ -374,7 +382,7 @@ public class TimeTrackingService {
                                                            LocalDate end, UserPrincipal principal) {
         var project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.REPORT_VIEW);
 
         // By-member
         List<Object[]> memberRows = timeTrackingRepository

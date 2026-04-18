@@ -4,6 +4,8 @@ import com.taskoryx.backend.entity.ActivityLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,4 +20,10 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, UUID> 
 
     List<ActivityLog> findByEntityTypeAndEntityIdOrderByCreatedAtDesc(
             ActivityLog.EntityType entityType, UUID entityId);
+
+    @Query("SELECT COUNT(a) FROM ActivityLog a WHERE a.user.id = :userId AND a.project.id = :projectId")
+    long countByUserIdAndProjectId(@Param("userId") UUID userId, @Param("projectId") UUID projectId);
+
+    @Query("SELECT a.user.id, COUNT(a) FROM ActivityLog a WHERE a.project.id = :projectId GROUP BY a.user.id")
+    List<Object[]> countPerUserByProjectId(@Param("projectId") UUID projectId);
 }

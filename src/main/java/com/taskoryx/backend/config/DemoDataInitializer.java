@@ -25,7 +25,7 @@ import java.util.*;
  * - 5 thành viên (admin là OWNER)
  * - 7 labels, 4 issue categories, 3 versions
  * - 4 sprints (3 COMPLETED + 1 ACTIVE)
- * - 25 tasks với comments, checklist, time tracking
+ * - 25 tasks với comments, time tracking
  */
 @Component
 @RequiredArgsConstructor
@@ -44,7 +44,6 @@ public class DemoDataInitializer implements ApplicationRunner {
     private final IssueCategoryRepository issueCategoryRepository;
     private final VersionRepository versionRepository;
     private final CommentRepository commentRepository;
-    private final ChecklistItemRepository checklistItemRepository;
     private final TimeTrackingRepository timeTrackingRepository;
     private final PasswordEncoder passwordEncoder;
     private final TaskLabelRepository taskLabelRepository;
@@ -169,13 +168,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(16), BigDecimal.valueOf(18),
                 null, catFeature, v100, colDone, new BigDecimal("1000"));
         addLabels(t1, lBe, lDb);
-        addChecklist(t1, admin, new String[]{
-            "Bảng users và phân quyền",
-            "Bảng products và categories",
-            "Bảng orders và order_items",
-            "Bảng payments",
-            "Thiết lập index cho query thường dùng"
-        }, new boolean[]{true, true, true, true, true});
         addTimeLog(t1, duc, "Phân tích yêu cầu và thiết kế ER diagram", 8, LocalDate.of(2026, 1, 7));
         addTimeLog(t1, duc, "Viết migration script", 6, LocalDate.of(2026, 1, 8));
         addComment(t1, admin, "Schema trông ổn, tuy nhiên cần thêm index cho cột `product_id` trong bảng `order_items` để tối ưu query thống kê.");
@@ -198,13 +190,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(20), BigDecimal.valueOf(22),
                 null, catFeature, v100, colDone, new BigDecimal("3000"));
         addLabels(t3, lFe, lUx);
-        addChecklist(t3, lan, new String[]{
-            "Wireframe trang chủ",
-            "Component Banner slideshow",
-            "Component CategoryGrid",
-            "Component ProductCard",
-            "Responsive mobile"
-        }, new boolean[]{true, true, true, true, true});
         addTimeLog(t3, lan, "Thiết kế wireframe và prototype Figma", 6, LocalDate.of(2026, 1, 9));
         addTimeLog(t3, lan, "Implement component Banner và CategoryGrid", 8, LocalDate.of(2026, 1, 13));
 
@@ -240,13 +225,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(24), BigDecimal.valueOf(26),
                 null, catFeature, v100, colDone, new BigDecimal("6000"));
         addLabels(t6, lBe, lApi);
-        addChecklist(t6, duc, new String[]{
-            "API GET /products (phân trang, filter, sort)",
-            "API POST /products",
-            "API PUT /products/{id}",
-            "API DELETE /products/{id}",
-            "Phân quyền theo role"
-        }, new boolean[]{true, true, true, true, true});
         addTimeLog(t6, duc, "Implement CRUD endpoints sản phẩm", 10, LocalDate.of(2026, 1, 22));
         addTimeLog(t6, duc, "Viết unit test và integration test", 6, LocalDate.of(2026, 1, 25));
 
@@ -301,13 +279,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(20), BigDecimal.valueOf(22),
                 null, catFeature, v110, colDone, new BigDecimal("11000"));
         addLabels(t11, lBe, lApi);
-        addChecklist(t11, duc, new String[]{
-            "API POST /cart/items — thêm sản phẩm",
-            "API PUT /cart/items/{id} — cập nhật số lượng",
-            "API DELETE /cart/items/{id} — xóa sản phẩm",
-            "Kiểm tra tồn kho khi thêm vào giỏ",
-            "Tính tổng tiền bao gồm discount"
-        }, new boolean[]{true, true, true, true, true});
         addTimeLog(t11, duc, "Implement cart service và repository", 8, LocalDate.of(2026, 2, 5));
         addTimeLog(t11, duc, "Xử lý race condition khi cập nhật tồn kho", 4, LocalDate.of(2026, 2, 7));
 
@@ -328,13 +299,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(24), BigDecimal.valueOf(28),
                 null, catFeature, v110, colDone, new BigDecimal("13000"));
         addLabels(t13, lBe, lApi);
-        addChecklist(t13, duc, new String[]{
-            "Đọc tài liệu tích hợp VNPay sandbox",
-            "Implement tạo URL thanh toán",
-            "Implement xử lý IPN callback",
-            "Test với thẻ test VNPay",
-            "Handle timeout và lỗi network"
-        }, new boolean[]{true, true, true, true, true});
         addTimeLog(t13, duc, "Implement VNPay integration và callback handler", 12, LocalDate.of(2026, 2, 11));
         addTimeLog(t13, duc, "Test và fix edge cases", 6, LocalDate.of(2026, 2, 13));
         addComment(t13, tuan, "Test payment flow xong. Tất cả 4 scenarios (success, fail, timeout, cancel) đều hoạt động đúng.");
@@ -356,12 +320,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(12), BigDecimal.valueOf(10),
                 null, catImprove, v110, colDone, new BigDecimal("15000"));
         addLabels(t15, lBe, lPerf, lDb);
-        addChecklist(t15, duc, new String[]{
-            "Profile query hiện tại bằng EXPLAIN ANALYZE",
-            "Thêm index còn thiếu",
-            "Implement query caching với Redis",
-            "Benchmark sau tối ưu"
-        }, new boolean[]{true, true, true, true});
         addTimeLog(t15, duc, "Phân tích query và thêm index", 4, LocalDate.of(2026, 2, 11));
         addTimeLog(t15, duc, "Implement Redis cache layer", 5, LocalDate.of(2026, 2, 13));
         addComment(t15, duc, "Sau khi thêm composite index (category_id, status, price) và cache Redis 5 phút, query xuống còn ~80ms. Đạt mục tiêu.");
@@ -377,14 +335,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(24), null,
                 null, catFeature, v200, colInProg, new BigDecimal("1000"));
         addLabels(t16, lBe, lApi);
-        addChecklist(t16, duc, new String[]{
-            "API POST /orders — tạo đơn hàng",
-            "API GET /orders — danh sách đơn (phân trang, filter)",
-            "API GET /orders/{id} — chi tiết đơn",
-            "API PATCH /orders/{id}/status — cập nhật trạng thái",
-            "API POST /orders/{id}/cancel — hủy đơn",
-            "Gửi notification khi đơn thay đổi trạng thái"
-        }, new boolean[]{true, true, false, false, false, false});
         addTimeLog(t16, duc, "Implement tạo đơn hàng và danh sách đơn", 8, LocalDate.of(2026, 3, 20));
         addComment(t16, duc, "Đã xong API tạo đơn và lấy danh sách. Đang implement cập nhật trạng thái.");
         addComment(t16, nam, "Nhớ implement state machine cho order status: PENDING → CONFIRMED → SHIPPING → DELIVERED. Không cho phép nhảy cóc.");
@@ -405,12 +355,6 @@ public class DemoDataInitializer implements ApplicationRunner {
                 BigDecimal.valueOf(20), null,
                 null, catFeature, v200, colTodo, new BigDecimal("2000"));
         addLabels(t17, lFe, lUx);
-        addChecklist(t17, lan, new String[]{
-            "OrderList page với filter và pagination",
-            "OrderDetail modal/page",
-            "Cập nhật trạng thái từ UI",
-            "Export đơn hàng ra Excel"
-        }, new boolean[]{false, false, false, false});
 
         Task t18 = saveTask(project, board, 18, "Tích hợp email thông báo đơn hàng",
                 "Gửi email tự động: xác nhận đơn, cập nhật trạng thái, thông báo giao hàng.",
@@ -557,20 +501,6 @@ public class DemoDataInitializer implements ApplicationRunner {
     private void addLabels(Task task, Label... labels) {
         for (Label label : labels) {
             taskLabelRepository.save(TaskLabel.builder().task(task).label(label).build());
-        }
-    }
-
-    private void addChecklist(Task task, User checkedBy, String[] items, boolean[] checked) {
-        for (int i = 0; i < items.length; i++) {
-            ChecklistItem item = ChecklistItem.builder()
-                    .task(task).content(items[i]).position(i)
-                    .isChecked(checked[i])
-                    .build();
-            if (checked[i]) {
-                item.setCheckedBy(checkedBy);
-                item.setCheckedAt(LocalDateTime.now().minusDays(1));
-            }
-            checklistItemRepository.save(item);
         }
     }
 

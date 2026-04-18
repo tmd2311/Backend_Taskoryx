@@ -1,10 +1,11 @@
 package com.taskoryx.backend.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskoryx.backend.dto.request.template.CreateProjectFromTemplateRequest;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
 import com.taskoryx.backend.dto.response.template.ProjectTemplateResponse;
+import com.taskoryx.backend.dto.response.template.TemplateColumnConfigDto;
+import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import com.taskoryx.backend.entity.*;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
@@ -18,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -98,21 +98,26 @@ public class ProjectTemplateService {
         // Parse and create columns from template config
         if (template.getColumnsConfig() != null) {
             try {
-                List<Map<String, Object>> columns = objectMapper.readValue(
-                    template.getColumnsConfig(), new TypeReference<List<Map<String, Object>>>() {});
-                for (int i = 0; i < columns.size(); i++) {
-                    Map<String, Object> colConfig = columns.get(i);
-                    BoardColumn column = BoardColumn.builder()
-                            .board(board)
-                            .name((String) colConfig.getOrDefault("name", "Column " + (i + 1)))
-                            .position(i)
-                            .color((String) colConfig.getOrDefault("color", "#6b7280"))
-                            .isCompleted((Boolean) colConfig.getOrDefault("isCompleted", false))
-                            .build();
-                    boardColumnRepository.save(column);
+                TemplateConfigDto config = objectMapper.readValue(
+                        template.getColumnsConfig(), TemplateConfigDto.class);
+                List<TemplateColumnConfigDto> columns = config.getColumns();
+                if (columns == null || columns.isEmpty()) {
+                    createDefaultColumns(board);
+                } else {
+                    for (int i = 0; i < columns.size(); i++) {
+                        TemplateColumnConfigDto col = columns.get(i);
+                        BoardColumn column = BoardColumn.builder()
+                                .board(board)
+                                .name(col.getName() != null ? col.getName() : "Column " + (i + 1))
+                                .position(i)
+                                .color(col.getColor() != null ? col.getColor() : "#6b7280")
+                                .isCompleted(Boolean.TRUE.equals(col.getIsCompleted()))
+                                .build();
+                        boardColumnRepository.save(column);
+                    }
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse template columns, using defaults", e);
+                log.warn("Failed to parse template columns config, using defaults", e);
                 createDefaultColumns(board);
             }
         } else {
@@ -143,43 +148,63 @@ public class ProjectTemplateService {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void initDefaultTemplates() {
-        if (templateRepository.count() > 0) return;
-        log.info("Initializing default project templates...");
+        // Kiểm tra theo category để support re-seed sau khi đổi format
+        boolean hasSoftware = templateRepository.findAll().stream()
+                .anyMatch(t -> "Software".equals(t.getCategory()));
+        if (hasSoftware) return;
+
+        log.info("Initializing default project templates (extended config format)...");
 
         createSystemTemplate("Phát triển phần mềm",
             "Template cho dự án phát triển phần mềm theo Agile/Scrum",
             "Software", "💻", "#1976d2",
-            "[{\"name\":\"Backlog\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
-            "{\"name\":\"Cần làm\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
-            "{\"name\":\"Đang làm\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
-            "{\"name\":\"Review\",\"color\":\"#8b5cf6\",\"isCompleted\":false}," +
-            "{\"name\":\"Done\",\"color\":\"#22c55e\",\"isCompleted\":true}]");
+            "{\"boardType\":\"SCRUM\"," +
+            "\"columns\":[" +
+              "{\"name\":\"Backlog\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
+              "{\"name\":\"Cần làm\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
+              "{\"name\":\"Đang làm\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
+              "{\"name\":\"Review\",\"color\":\"#8b5cf6\",\"isCompleted\":false}," +
+              "{\"name\":\"Done\",\"color\":\"#22c55e\",\"isCompleted\":true}]," +
+            "\"taskFields\":[\"priority\",\"dueDate\",\"estimatedHours\",\"assignee\",\"labels\",\"sprint\"]," +
+            "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}}");
 
         createSystemTemplate("Dự án Marketing",
             "Template cho chiến dịch marketing và truyền thông",
             "Marketing", "📣", "#e91e63",
-            "[{\"name\":\"Ý tưởng\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
-            "{\"name\":\"Lên kế hoạch\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
-            "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
-            "{\"name\":\"Đánh giá\",\"color\":\"#8b5cf6\",\"isCompleted\":false}," +
-            "{\"name\":\"Hoàn thành\",\"color\":\"#22c55e\",\"isCompleted\":true}]");
+            "{\"boardType\":\"KANBAN\"," +
+            "\"columns\":[" +
+              "{\"name\":\"Ý tưởng\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
+              "{\"name\":\"Lên kế hoạch\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
+              "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
+              "{\"name\":\"Đánh giá\",\"color\":\"#8b5cf6\",\"isCompleted\":false}," +
+              "{\"name\":\"Hoàn thành\",\"color\":\"#22c55e\",\"isCompleted\":true}]," +
+            "\"taskFields\":[\"priority\",\"dueDate\",\"assignee\",\"labels\"]," +
+            "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}}");
 
         createSystemTemplate("Thiết kế UI/UX",
             "Template cho dự án thiết kế giao diện và trải nghiệm người dùng",
             "Design", "🎨", "#9c27b0",
-            "[{\"name\":\"Research\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
-            "{\"name\":\"Wireframe\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
-            "{\"name\":\"Design\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
-            "{\"name\":\"Review\",\"color\":\"#ef4444\",\"isCompleted\":false}," +
-            "{\"name\":\"Approved\",\"color\":\"#22c55e\",\"isCompleted\":true}]");
+            "{\"boardType\":\"KANBAN\"," +
+            "\"columns\":[" +
+              "{\"name\":\"Research\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
+              "{\"name\":\"Wireframe\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
+              "{\"name\":\"Design\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
+              "{\"name\":\"Review\",\"color\":\"#ef4444\",\"isCompleted\":false}," +
+              "{\"name\":\"Approved\",\"color\":\"#22c55e\",\"isCompleted\":true}]," +
+            "\"taskFields\":[\"priority\",\"dueDate\",\"assignee\",\"attachments\"]," +
+            "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}}");
 
         createSystemTemplate("Quản lý sự kiện",
             "Template cho tổ chức và quản lý sự kiện",
             "Event", "🎪", "#ff5722",
-            "[{\"name\":\"Lên kế hoạch\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
-            "{\"name\":\"Chuẩn bị\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
-            "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
-            "{\"name\":\"Đã xong\",\"color\":\"#22c55e\",\"isCompleted\":true}]");
+            "{\"boardType\":\"KANBAN\"," +
+            "\"columns\":[" +
+              "{\"name\":\"Lên kế hoạch\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
+              "{\"name\":\"Chuẩn bị\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
+              "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
+              "{\"name\":\"Đã xong\",\"color\":\"#22c55e\",\"isCompleted\":true}]," +
+            "\"taskFields\":[\"priority\",\"dueDate\",\"assignee\"]," +
+            "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}}");
 
         log.info("Default templates initialized successfully");
     }

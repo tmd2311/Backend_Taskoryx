@@ -5,6 +5,7 @@ import com.taskoryx.backend.dto.request.comment.UpdateCommentRequest;
 import com.taskoryx.backend.dto.response.comment.CommentResponse;
 import com.taskoryx.backend.entity.Comment;
 import com.taskoryx.backend.entity.CommentMention;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.ForbiddenException;
@@ -35,7 +36,7 @@ public class CommentService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     // Pattern để tìm @username trong comment
     private static final Pattern MENTION_PATTERN = Pattern.compile("@([a-zA-Z0-9_-]+)");
@@ -44,7 +45,8 @@ public class CommentService {
     public List<CommentResponse> getComments(UUID taskId, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_VIEW);
 
         return commentRepository.findRootCommentsByTaskId(taskId)
                 .stream()
@@ -56,7 +58,8 @@ public class CommentService {
     public CommentResponse createComment(UUID taskId, CreateCommentRequest request, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.COMMENT_CREATE);
 
         User author = userRepository.findById(principal.getId()).orElseThrow();
 
@@ -92,6 +95,8 @@ public class CommentService {
     public CommentResponse updateComment(UUID commentId, UpdateCommentRequest request, UserPrincipal principal) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentId));
+        projectAuthorizationService.requirePermission(comment.getTask().getProject().getId(), principal.getId(),
+                ProjectPermission.COMMENT_CREATE);
 
         if (!comment.getUser().getId().equals(principal.getId())) {
             throw new ForbiddenException("Bạn không có quyền chỉnh sửa bình luận này");
@@ -114,7 +119,9 @@ public class CommentService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentId));
 
-        if (!comment.getUser().getId().equals(principal.getId())) {
+        if (!comment.getUser().getId().equals(principal.getId())
+                && !projectAuthorizationService.hasPermission(comment.getTask().getProject().getId(),
+                principal.getId(), ProjectPermission.COMMENT_DELETE)) {
             throw new ForbiddenException("Bạn không có quyền xóa bình luận này");
         }
         commentRepository.delete(comment);

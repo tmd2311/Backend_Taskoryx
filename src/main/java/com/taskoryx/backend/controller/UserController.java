@@ -4,8 +4,10 @@ import com.taskoryx.backend.dto.request.user.ChangePasswordRequest;
 import com.taskoryx.backend.dto.request.user.UpdateProfileRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
 import com.taskoryx.backend.dto.response.PagedResponse;
+import com.taskoryx.backend.dto.response.performance.UserPerformanceResponse;
 import com.taskoryx.backend.dto.response.user.UserResponse;
 import com.taskoryx.backend.security.UserPrincipal;
+import com.taskoryx.backend.service.PerformanceService;
 import com.taskoryx.backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,16 +18,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
  * REST Controller cho User Management
  *
- * GET    /api/users/me              - Lấy thông tin cá nhân
- * PUT    /api/users/me              - Cập nhật thông tin cá nhân
- * PUT    /api/users/me/password     - Đổi mật khẩu
- * GET    /api/users/{id}            - Lấy thông tin user khác
- * GET    /api/users/search          - Tìm kiếm user (để @mention)
+ * GET    /api/users/me                  - Lấy thông tin cá nhân
+ * PUT    /api/users/me                  - Cập nhật thông tin cá nhân
+ * PUT    /api/users/me/password         - Đổi mật khẩu
+ * GET    /api/users/me/performance      - Điểm hiệu suất trên tất cả projects
+ * GET    /api/users/{id}                - Lấy thông tin user khác
+ * GET    /api/users/search              - Tìm kiếm user (để @mention)
  */
 @RestController
 @RequestMapping("/users")
@@ -34,6 +38,7 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final PerformanceService performanceService;
 
     @GetMapping("/me")
     @Operation(summary = "Lấy thông tin người dùng hiện tại")
@@ -49,6 +54,14 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thành công",
                 userService.updateProfile(principal, request)));
+    }
+
+    @GetMapping("/me/performance")
+    @Operation(summary = "Lấy điểm hiệu suất của bản thân trên tất cả projects đã tham gia")
+    public ResponseEntity<ApiResponse<List<UserPerformanceResponse>>> getMyPerformance(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                performanceService.getMyPerformanceAcrossProjects(principal)));
     }
 
     @PutMapping("/me/password")

@@ -83,4 +83,12 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
     @Query("SELECT t FROM Task t WHERE t.project.key = :projectKey AND t.taskNumber = :taskNumber")
     Optional<Task> findByProjectKeyAndTaskNumber(@Param("projectKey") String projectKey,
                                                   @Param("taskNumber") Integer taskNumber);
+
+    // Sprint-scoped tasks for a specific assignee (used by PerformanceService)
+    @Query("SELECT t FROM Sprint s JOIN s.tasks t WHERE s.id = :sprintId AND t.assignee.id = :userId")
+    List<Task> findTasksBySprintIdAndAssigneeId(@Param("sprintId") UUID sprintId,
+                                                @Param("userId") UUID userId);
+
+    // All tasks assigned to a user in a project (used by PerformanceService)
+    List<Task> findByProjectIdAndAssigneeId(UUID projectId, UUID assigneeId);
 }

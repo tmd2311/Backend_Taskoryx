@@ -10,6 +10,7 @@ import com.taskoryx.backend.dto.response.project.ProjectResponse;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.Project;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.ProjectMember;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.BadRequestException;
@@ -40,6 +41,7 @@ public class ProjectService {
     private final BoardRepository boardRepository;
     private final BoardColumnRepository boardColumnRepository;
     private final TaskRepository taskRepository;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     @Transactional(readOnly = true)
     public List<ProjectResponse> getMyProjects(UserPrincipal principal) {
@@ -92,7 +94,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public ProjectResponse getProject(UUID projectId, UserPrincipal principal) {
-        Project project = findProjectWithAccess(projectId, principal.getId());
+        Project project = projectAuthorizationService.requireProjectAccess(projectId, principal.getId());
         ProjectResponse response = ProjectResponse.from(project);
         projectMemberRepository.findRoleByProjectIdAndUserId(projectId, principal.getId())
                 .ifPresent(response::setCurrentUserRole);
@@ -101,8 +103,7 @@ public class ProjectService {
 
     @Transactional
     public ProjectResponse updateProject(UUID projectId, UpdateProjectRequest request, UserPrincipal principal) {
-        Project project = findProjectWithAccess(projectId, principal.getId());
-        requireAdminOrOwner(projectId, principal.getId());
+        Project project = projectAuthorizationService.requireProjectAdmin(projectId, principal.getId());
 
         if (request.getName() != null) project.setName(request.getName());
         if (request.getDescription() != null) project.setDescription(request.getDescription());
@@ -116,7 +117,7 @@ public class ProjectService {
 
     @Transactional
     public void deleteProject(UUID projectId, UserPrincipal principal) {
-        Project project = findProjectWithAccess(projectId, principal.getId());
+        Project project = projectAuthorizationService.requireProjectAccess(projectId, principal.getId());
         if (!project.getOwner().getId().equals(principal.getId())) {
             throw new ForbiddenException("Chỉ chủ sở hữu mới có thể xóa dự án");
         }
@@ -133,7 +134,7 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<ProjectMemberResponse> getMembers(UUID projectId, UserPrincipal principal) {
-        findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requireProjectAccess(projectId, principal.getId());
         return projectMemberRepository.findByProjectId(projectId)
                 .stream()
                 .map(ProjectMemberResponse::from)
@@ -147,7 +148,7 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<MentionedUserInfo> searchMembersForMention(UUID projectId, String keyword,
                                                             UserPrincipal principal) {
-        findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requireProjectAccess(projectId, principal.getId());
         return projectMemberRepository
                 .searchMembersByKeyword(projectId, keyword == null ? "" : keyword)
                 .stream()
@@ -162,7 +163,7 @@ public class ProjectService {
 
     @Transactional
     public ProjectMemberResponse addMember(UUID projectId, AddMemberRequest request, UserPrincipal principal) {
-        requireAdminOrOwner(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
 
@@ -199,7 +200,7 @@ public class ProjectService {
     public ProjectMemberResponse updateMemberRole(UUID projectId, UUID userId,
                                                    UpdateMemberRoleRequest request,
                                                    UserPrincipal principal) {
-        requireAdminOrOwner(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong dự án"));
         if ("OWNER".equals(member.getRole())) {
@@ -211,7 +212,7 @@ public class ProjectService {
 
     @Transactional
     public void removeMember(UUID projectId, UUID userId, UserPrincipal principal) {
-        requireAdminOrOwner(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong dự án"));
         if ("OWNER".equals(member.getRole())) {
@@ -223,23 +224,7 @@ public class ProjectService {
     // ========== HELPERS ==========
 
     public Project findProjectWithAccess(UUID projectId, UUID userId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
-        if (!projectRepository.isProjectMember(projectId, userId)
-                && !project.getIsPublic()
-                && !project.getOwner().getId().equals(userId)) {
-            throw new ForbiddenException("Bạn không có quyền truy cập dự án này");
-        }
-        return project;
-    }
-
-    private void requireAdminOrOwner(UUID projectId, UUID userId) {
-        String role = projectMemberRepository
-                .findRoleByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new ForbiddenException("Bạn không phải thành viên của dự án này"));
-        if (!"OWNER".equals(role) && !"ADMIN".equals(role)) {
-            throw new ForbiddenException("Bạn cần quyền ADMIN hoặc OWNER để thực hiện thao tác này");
-        }
+        return projectAuthorizationService.requireProjectAccess(projectId, userId);
     }
 
     private void createDefaultBoard(Project project) {

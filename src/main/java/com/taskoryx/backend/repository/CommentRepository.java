@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.UUID;
 
+
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
@@ -20,4 +21,10 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     long countByTaskId(UUID taskId);
 
     List<Comment> findByParentId(UUID parentId);
+
+    @Query("SELECT COUNT(c) FROM Comment c WHERE c.user.id = :userId AND c.task.project.id = :projectId")
+    long countByUserIdAndProjectId(@Param("userId") UUID userId, @Param("projectId") UUID projectId);
+
+    @Query("SELECT c.user.id, COUNT(c) FROM Comment c WHERE c.task.project.id = :projectId GROUP BY c.user.id")
+    List<Object[]> countPerUserByProjectId(@Param("projectId") UUID projectId);
 }

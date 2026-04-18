@@ -5,7 +5,7 @@ import com.taskoryx.backend.dto.request.category.UpdateCategoryRequest;
 import com.taskoryx.backend.dto.response.category.CategoryResponse;
 import com.taskoryx.backend.entity.IssueCategory;
 import com.taskoryx.backend.entity.Project;
-import com.taskoryx.backend.entity.ProjectMember;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
@@ -25,13 +25,12 @@ import java.util.stream.Collectors;
 public class IssueCategoryService {
 
     private final IssueCategoryRepository categoryRepository;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
     private final UserRepository userRepository;
 
     @Transactional
     public CategoryResponse createCategory(UUID projectId, CreateCategoryRequest request, UserPrincipal principal) {
-        Project project = projectService.findProjectWithAccess(projectId, principal.getId());
-        requireAdminOrOwner(project, principal.getId());
+        Project project = projectAuthorizationService.requireProjectAdmin(projectId, principal.getId());
 
         if (categoryRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new BadRequestException("Danh mục '" + request.getName() + "' đã tồn tại trong project này");
@@ -54,7 +53,7 @@ public class IssueCategoryService {
 
     @Transactional(readOnly = true)
     public List<CategoryResponse> getCategories(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
         return categoryRepository.findByProjectIdOrderByNameAsc(projectId).stream()
                 .map(CategoryResponse::from)
                 .collect(Collectors.toList());
@@ -63,8 +62,8 @@ public class IssueCategoryService {
     @Transactional
     public CategoryResponse updateCategory(UUID categoryId, UpdateCategoryRequest request, UserPrincipal principal) {
         IssueCategory category = findCategoryById(categoryId);
-        Project project = projectService.findProjectWithAccess(category.getProject().getId(), principal.getId());
-        requireAdminOrOwner(project, principal.getId());
+        Project project = projectAuthorizationService.requireProjectAdmin(category.getProject().getId(),
+                principal.getId());
 
         if (request.getName() != null && !request.getName().equals(category.getName())) {
             if (categoryRepository.existsByProjectIdAndName(project.getId(), request.getName())) {
@@ -87,8 +86,7 @@ public class IssueCategoryService {
     @Transactional
     public void deleteCategory(UUID categoryId, UserPrincipal principal) {
         IssueCategory category = findCategoryById(categoryId);
-        Project project = projectService.findProjectWithAccess(category.getProject().getId(), principal.getId());
-        requireAdminOrOwner(project, principal.getId());
+        projectAuthorizationService.requireProjectAdmin(category.getProject().getId(), principal.getId());
 
         if (!category.getTasks().isEmpty()) {
             throw new BadRequestException("Không thể xóa danh mục đang có task. Hãy gỡ task khỏi danh mục trước.");
@@ -99,15 +97,5 @@ public class IssueCategoryService {
     public IssueCategory findCategoryById(UUID id) {
         return categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("IssueCategory", "id", id));
-    }
-
-    private void requireAdminOrOwner(Project project, UUID userId) {
-        boolean isOwner = project.getOwner().getId().equals(userId);
-        boolean isAdmin = project.getMembers().stream()
-                .filter(m -> m.getUser().getId().equals(userId))
-                .anyMatch(m -> "ADMIN".equals(m.getRole()));
-        if (!isOwner && !isAdmin) {
-            throw new BadRequestException("Chỉ OWNER hoặc ADMIN mới có thể thực hiện thao tác này");
-        }
     }
 }

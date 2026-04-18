@@ -11,6 +11,7 @@ import com.taskoryx.backend.dto.response.board.KanbanBoardResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
@@ -36,10 +37,11 @@ public class BoardService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     @Transactional(readOnly = true)
     public List<BoardResponse> getBoardsByProject(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.BOARD_VIEW);
         return boardRepository.findByProjectIdOrderByPositionAsc(projectId)
                 .stream()
                 .map(BoardResponse::from)
@@ -50,7 +52,8 @@ public class BoardService {
     public KanbanBoardResponse getKanbanBoard(UUID boardId, UserPrincipal principal) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
-        projectService.findProjectWithAccess(board.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(board.getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_VIEW);
 
         List<BoardColumn> columns = boardColumnRepository.findByBoardIdOrderByPositionAsc(boardId);
 
@@ -87,6 +90,7 @@ public class BoardService {
 
     @Transactional
     public BoardResponse createBoard(UUID projectId, CreateBoardRequest request, UserPrincipal principal) {
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.BOARD_UPDATE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         Board.BoardType boardType = request.getBoardType() != null ? request.getBoardType() : Board.BoardType.KANBAN;
@@ -118,7 +122,8 @@ public class BoardService {
     public BoardResponse updateBoard(UUID boardId, UpdateBoardRequest request, UserPrincipal principal) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
-        projectService.findProjectWithAccess(board.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(board.getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_UPDATE);
 
         if (request.getName() != null) board.setName(request.getName());
         if (request.getDescription() != null) board.setDescription(request.getDescription());
@@ -129,7 +134,8 @@ public class BoardService {
     public void deleteBoard(UUID boardId, UserPrincipal principal) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
-        projectService.findProjectWithAccess(board.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(board.getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_UPDATE);
         if (board.getBoardType() == Board.BoardType.SPRINT) {
             throw new BadRequestException("Không thể xóa board sprint thủ công — board này được quản lí tự động theo sprint");
         }
@@ -142,7 +148,8 @@ public class BoardService {
     public BoardColumnResponse createColumn(UUID boardId, CreateColumnRequest request, UserPrincipal principal) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
-        projectService.findProjectWithAccess(board.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(board.getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_UPDATE);
         if (board.getBoardType() == Board.BoardType.SPRINT) {
             throw new BadRequestException("Không thể thêm cột vào board sprint — các cột được quản lí tự động theo trạng thái task");
         }
@@ -163,7 +170,8 @@ public class BoardService {
     public BoardColumnResponse updateColumn(UUID columnId, UpdateColumnRequest request, UserPrincipal principal) {
         BoardColumn column = boardColumnRepository.findById(columnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", columnId));
-        projectService.findProjectWithAccess(column.getBoard().getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(column.getBoard().getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_UPDATE);
         if (column.getBoard().getBoardType() == Board.BoardType.SPRINT) {
             throw new BadRequestException("Không thể chỉnh sửa cột của board sprint");
         }
@@ -179,7 +187,8 @@ public class BoardService {
     public void moveColumn(UUID columnId, MoveColumnRequest request, UserPrincipal principal) {
         BoardColumn column = boardColumnRepository.findById(columnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", columnId));
-        projectService.findProjectWithAccess(column.getBoard().getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(column.getBoard().getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_UPDATE);
         if (column.getBoard().getBoardType() == Board.BoardType.SPRINT) {
             throw new BadRequestException("Không thể di chuyển cột của board sprint");
         }
@@ -202,7 +211,8 @@ public class BoardService {
     public void deleteColumn(UUID columnId, UserPrincipal principal) {
         BoardColumn column = boardColumnRepository.findById(columnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", columnId));
-        projectService.findProjectWithAccess(column.getBoard().getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(column.getBoard().getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_UPDATE);
         if (column.getBoard().getBoardType() == Board.BoardType.SPRINT) {
             throw new BadRequestException("Không thể xóa cột của board sprint");
         }

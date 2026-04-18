@@ -7,15 +7,13 @@ import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.Project;
-import com.taskoryx.backend.entity.ProjectMember;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.Sprint;
 import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.exception.BadRequestException;
-import com.taskoryx.backend.exception.ForbiddenException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.BoardColumnRepository;
 import com.taskoryx.backend.repository.BoardRepository;
-import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.SprintRepository;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.security.UserPrincipal;
@@ -39,13 +37,13 @@ public class SprintService {
     private final BoardRepository boardRepository;
     private final BoardColumnRepository boardColumnRepository;
     private final ProjectService projectService;
-    private final ProjectMemberRepository projectMemberRepository;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     // ========== CREATE ==========
 
     public SprintResponse createSprint(UUID projectId, CreateSprintRequest request, UserPrincipal principal) {
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.SPRINT_MANAGE);
         Project project = projectService.findProjectWithAccess(projectId, principal.getId());
-        requireAdminOrOwner(projectId, principal.getId());
 
         if (request.getStartDate() != null && request.getEndDate() != null) {
             if (!request.getStartDate().isBefore(request.getEndDate())) {
@@ -107,7 +105,7 @@ public class SprintService {
 
     @Transactional(readOnly = true)
     public List<SprintResponse> getSprints(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.BOARD_VIEW);
         return sprintRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
                 .stream()
                 .map(SprintResponse::from)
@@ -117,7 +115,8 @@ public class SprintService {
     @Transactional(readOnly = true)
     public SprintResponse getSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        projectService.findProjectWithAccess(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_VIEW);
         return SprintResponse.fromWithTasks(sprint);
     }
 
@@ -125,7 +124,8 @@ public class SprintService {
 
     public SprintResponse updateSprint(UUID sprintId, UpdateSprintRequest request, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        requireAdminOrOwner(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.SPRINT_MANAGE);
 
         if (sprint.getStatus() == Sprint.SprintStatus.COMPLETED
                 || sprint.getStatus() == Sprint.SprintStatus.CANCELLED) {
@@ -162,7 +162,8 @@ public class SprintService {
 
     public SprintResponse startSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        requireAdminOrOwner(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.SPRINT_MANAGE);
 
         if (sprint.getStatus() != Sprint.SprintStatus.PLANNED) {
             throw new BadRequestException("Chỉ có thể bắt đầu sprint đang ở trạng thái PLANNED");
@@ -185,7 +186,8 @@ public class SprintService {
 
     public SprintResponse completeSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        requireAdminOrOwner(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.SPRINT_MANAGE);
 
         if (sprint.getStatus() != Sprint.SprintStatus.ACTIVE) {
             throw new BadRequestException("Chỉ có thể hoàn thành sprint đang ở trạng thái ACTIVE");
@@ -203,7 +205,8 @@ public class SprintService {
     @Transactional(readOnly = true)
     public List<TaskSummaryResponse> getSprintBacklog(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        projectService.findProjectWithAccess(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_VIEW);
         return sprint.getTasks().stream()
                 .filter(t -> t.getColumn() == null)
                 .map(TaskSummaryResponse::from)
@@ -214,7 +217,8 @@ public class SprintService {
 
     public void deleteSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        requireAdminOrOwner(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.SPRINT_MANAGE);
 
         if (sprint.getStatus() != Sprint.SprintStatus.PLANNED) {
             throw new BadRequestException("Chỉ có thể xóa sprint đang ở trạng thái PLANNED");
@@ -236,7 +240,8 @@ public class SprintService {
 
     public SprintResponse addTaskToSprint(UUID sprintId, UUID taskId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        projectService.findProjectWithAccess(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.SPRINT_MANAGE);
 
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
@@ -252,7 +257,8 @@ public class SprintService {
 
     public SprintResponse removeTaskFromSprint(UUID sprintId, UUID taskId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
-        projectService.findProjectWithAccess(sprint.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.SPRINT_MANAGE);
 
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
@@ -267,14 +273,5 @@ public class SprintService {
     private Sprint findSprintById(UUID sprintId) {
         return sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sprint", "id", sprintId));
-    }
-
-    private void requireAdminOrOwner(UUID projectId, UUID userId) {
-        String role = projectMemberRepository
-                .findRoleByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new ForbiddenException("Bạn không phải thành viên của dự án này"));
-        if (!"OWNER".equals(role) && !"ADMIN".equals(role)) {
-            throw new ForbiddenException("Bạn cần quyền ADMIN hoặc OWNER để thực hiện thao tác này");
-        }
     }
 }

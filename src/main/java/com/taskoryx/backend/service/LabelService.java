@@ -3,6 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.dto.request.label.CreateLabelRequest;
 import com.taskoryx.backend.dto.response.label.LabelResponse;
 import com.taskoryx.backend.entity.Label;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.LabelRepository;
@@ -21,10 +22,11 @@ public class LabelService {
 
     private final LabelRepository labelRepository;
     private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     @Transactional(readOnly = true)
     public List<LabelResponse> getLabels(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
         return labelRepository.findByProjectIdOrderByNameAsc(projectId)
                 .stream()
                 .map(LabelResponse::from)
@@ -33,6 +35,7 @@ public class LabelService {
 
     @Transactional
     public LabelResponse createLabel(UUID projectId, CreateLabelRequest request, UserPrincipal principal) {
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_UPDATE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         if (labelRepository.existsByProjectIdAndName(projectId, request.getName())) {
@@ -52,7 +55,8 @@ public class LabelService {
     public void deleteLabel(UUID labelId, UserPrincipal principal) {
         Label label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Label", "id", labelId));
-        projectService.findProjectWithAccess(label.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(label.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_UPDATE);
         labelRepository.delete(label);
     }
 }

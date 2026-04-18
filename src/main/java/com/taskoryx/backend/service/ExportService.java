@@ -1,6 +1,7 @@
 package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.entity.Task;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -21,14 +22,14 @@ import java.util.UUID;
 public class ExportService {
 
     private final TaskRepository taskRepository;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     @Transactional(readOnly = true)
     public byte[] exportProjectTasksToExcel(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.REPORT_VIEW);
 
         List<Task> tasks = taskRepository.findByProjectId(projectId, PageRequest.of(0, 10000)).getContent();
 

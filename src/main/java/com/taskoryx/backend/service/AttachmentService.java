@@ -6,6 +6,7 @@ import com.taskoryx.backend.dto.response.attachment.AttachmentStatsResponse;
 import com.taskoryx.backend.entity.Attachment;
 import com.taskoryx.backend.entity.Comment;
 import com.taskoryx.backend.entity.FileCategory;
+import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.BadRequestException;
@@ -68,7 +69,7 @@ public class AttachmentService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final CommentRepository commentRepository;
-    private final ProjectService projectService;
+    private final ProjectAuthorizationService projectAuthorizationService;
     private final AppProperties appProperties;
 
     /**
@@ -83,7 +84,8 @@ public class AttachmentService {
     public List<AttachmentResponse> getAttachments(UUID taskId, FileCategory category, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_VIEW);
 
         List<Attachment> attachments = attachmentRepository.findByTaskIdOrderByCreatedAtDesc(taskId);
         return attachments.stream()
@@ -110,7 +112,7 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public Page<AttachmentResponse> getProjectAttachments(UUID projectId, FileCategory category,
                                                            Pageable pageable, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
 
         if (category == null) {
             // Không có filter: dùng DB pagination
@@ -142,7 +144,8 @@ public class AttachmentService {
     public AttachmentStatsResponse getTaskStats(UUID taskId, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_VIEW);
 
         List<AttachmentCategoryStatsProjection> projections =
                 attachmentRepository.getStatsByTaskId(taskId);
@@ -155,7 +158,7 @@ public class AttachmentService {
      */
     @Transactional(readOnly = true)
     public AttachmentStatsResponse getProjectStats(UUID projectId, UserPrincipal principal) {
-        projectService.findProjectWithAccess(projectId, principal.getId());
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
 
         List<AttachmentCategoryStatsProjection> projections =
                 attachmentRepository.getStatsByProjectId(projectId);
@@ -174,7 +177,8 @@ public class AttachmentService {
     public ResponseEntity<Resource> serveFile(UUID attachmentId, boolean inline, UserPrincipal principal) {
         Attachment attachment = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment", "id", attachmentId));
-        projectService.findProjectWithAccess(attachment.getTask().getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(attachment.getTask().getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_VIEW);
 
         Path filePath = Paths.get(appProperties.getStorage().getUploadDir())
                 .resolve(attachment.getStoragePath());
@@ -205,7 +209,8 @@ public class AttachmentService {
                                                 UserPrincipal principal) throws IOException {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
-        projectService.findProjectWithAccess(task.getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.ATTACHMENT_MANAGE);
 
         if (file.isEmpty()) {
             throw new BadRequestException("File không được để trống");
@@ -253,7 +258,8 @@ public class AttachmentService {
     public List<AttachmentResponse> getCommentAttachments(UUID commentId, UserPrincipal principal) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentId));
-        projectService.findProjectWithAccess(comment.getTask().getProject().getId(), principal.getId());
+        projectAuthorizationService.requirePermission(comment.getTask().getProject().getId(), principal.getId(),
+                ProjectPermission.TASK_VIEW);
         return attachmentRepository.findByCommentIdOrderByCreatedAtAsc(commentId)
                 .stream().map(AttachmentResponse::from).toList();
     }
@@ -263,7 +269,9 @@ public class AttachmentService {
         Attachment attachment = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment", "id", attachmentId));
 
-        if (!attachment.getUploadedBy().getId().equals(principal.getId())) {
+        if (!attachment.getUploadedBy().getId().equals(principal.getId())
+                && !projectAuthorizationService.hasPermission(attachment.getTask().getProject().getId(),
+                principal.getId(), ProjectPermission.ATTACHMENT_MANAGE)) {
             throw new ForbiddenException("Bạn không có quyền xóa file này");
         }
 

@@ -51,6 +51,7 @@ log/
 
 ### Documentation
 doc/
+docs/
 
 ### Sensitive Files ###
 **/application-secret.yaml
@@ -61,3 +62,8 @@ doc/
 
 /.claude
 CLAUDE.md
+
+.codex
+
+
+uploads
