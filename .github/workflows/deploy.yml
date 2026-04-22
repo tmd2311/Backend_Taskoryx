@@ -47,5 +47,34 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
           script: |
-            chmod +x /home/ubuntu/taskoryx-backend/run.sh
-            /home/ubuntu/taskoryx-backend/run.sh
+            APP_DIR=/home/ubuntu/taskoryx-backend
+            mkdir -p $APP_DIR/logs $APP_DIR/uploads
+
+            cat > $APP_DIR/run.sh << 'EOF'
+            #!/bin/bash
+            set -e
+
+            APP_DIR=/home/ubuntu/taskoryx-backend
+            JAR_FILE=$APP_DIR/app.jar
+            LOG_FILE=$APP_DIR/logs/app.log
+
+            mkdir -p $APP_DIR/logs
+            mkdir -p $APP_DIR/uploads
+
+            echo "Loading env..."
+            export $(grep -v '^#' $APP_DIR/.env | xargs)
+
+            echo "Stopping old app..."
+            pkill -f "app.jar" || true
+            sleep 2
+
+            echo "Starting new app..."
+            nohup java -jar $JAR_FILE \
+              -Dspring.profiles.active=prod \
+              > $LOG_FILE 2>&1 &
+
+            echo "Done! PID=$!"
+            EOF
+
+            chmod +x $APP_DIR/run.sh
+            $APP_DIR/run.sh
