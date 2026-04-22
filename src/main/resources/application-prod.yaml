@@ -1,57 +1,83 @@
-# ==================== PRODUCTION ENVIRONMENT ====================
-
 spring:
+  # ==================== DATABASE ====================
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/taskoryx_prod}
-    username: ${DATABASE_USERNAME:postgres}
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 10
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
+  # ==================== JPA ====================
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
         format_sql: false
+    open-in-view: false
 
+  # ==================== MAIL ====================
   mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
+    host: smtp.gmail.com
+    port: 587
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
+# ==================== SERVER ====================
 server:
-  port: ${SERVER_PORT:8080}
+  port: 8080
   error:
     include-message: never
     include-binding-errors: never
     include-stacktrace: never
 
+# ==================== JWT ====================
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+# ==================== APPLICATION ====================
+application:
+  frontend-url: ${FRONTEND_URL}
+  cors:
+    allowed-origins:
+      - ${CORS_ORIGIN_1}
+      - ${CORS_ORIGIN_2}
+  storage:
+    upload-dir: ${UPLOAD_DIR:/home/ubuntu/taskoryx-backend/uploads}
+
+# ==================== LOGGING ====================
 logging:
   level:
-    root: WARN
+    root: INFO
     com.taskoryx: INFO
     org.springframework.web: WARN
     org.springframework.security: WARN
+    org.hibernate.SQL: WARN
   file:
-    name: /var/log/taskoryx/application.log
+    name: ${LOG_FILE:/home/ubuntu/taskoryx-backend/logs/taskoryx.log}
+    max-size: 10MB
+    max-history: 30
 
-jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:3600000}
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}
-
-application:
-  frontend-url: ${FRONTEND_URL:https://yourdomain.com}
-  cors:
-    allowed-origins:
-      - ${FRONTEND_URL:https://yourdomain.com}
-
+# ==================== SWAGGER (tắt trên production) ====================
 springdoc:
-  swagger-ui:
-    enabled: false
   api-docs:
+    enabled: false
+  swagger-ui:
     enabled: false

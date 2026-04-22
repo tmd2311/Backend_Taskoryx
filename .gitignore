@@ -53,6 +53,9 @@ log/
 doc/
 docs/
 
+### Build artifacts ###
+app.jar
+
 ### Sensitive Files ###
 **/application-secret.yaml
 **/application-secret.yml
