@@ -46,20 +46,19 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
                                   @Param("keyword") String keyword,
                                   Pageable pageable);
 
+    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.sprint.id = :sprintId AND " +
+           "(LOWER(t.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(t.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    Page<Task> searchByProjectIdAndSprintId(@Param("projectId") UUID projectId,
+                                            @Param("sprintId") UUID sprintId,
+                                            @Param("keyword") String keyword,
+                                            Pageable pageable);
+
+    Page<Task> findByProjectIdAndSprintId(UUID projectId, UUID sprintId, Pageable pageable);
+
     long countByProjectIdAndColumnId(UUID projectId, UUID columnId);
 
     long countByProjectId(UUID projectId);
-
-    List<Task> findByProjectIdAndColumnIsNullOrderByCreatedAtDesc(UUID projectId);
-
-    /**
-     * Product Backlog: tasks chưa có column VÀ không thuộc sprint nào đang PLANNED/ACTIVE
-     */
-    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.column IS NULL " +
-           "AND t.id NOT IN (SELECT st.id FROM Sprint s JOIN s.tasks st " +
-           "WHERE s.project.id = :projectId AND s.status IN ('PLANNED', 'ACTIVE')) " +
-           "ORDER BY t.createdAt DESC")
-    List<Task> findProductBacklog(@Param("projectId") UUID projectId);
 
     @Query("SELECT COUNT(t) FROM Task t WHERE t.project.id = :projectId AND t.status = :status")
     long countByProjectIdAndStatus(@Param("projectId") UUID projectId, @Param("status") Task.TaskStatus status);
@@ -85,10 +84,14 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
                                                   @Param("taskNumber") Integer taskNumber);
 
     // Sprint-scoped tasks for a specific assignee (used by PerformanceService)
-    @Query("SELECT t FROM Sprint s JOIN s.tasks t WHERE s.id = :sprintId AND t.assignee.id = :userId")
+    @Query("SELECT t FROM Task t WHERE t.sprint.id = :sprintId AND t.assignee.id = :userId")
     List<Task> findTasksBySprintIdAndAssigneeId(@Param("sprintId") UUID sprintId,
                                                 @Param("userId") UUID userId);
 
     // All tasks assigned to a user in a project (used by PerformanceService)
     List<Task> findByProjectIdAndAssigneeId(UUID projectId, UUID assigneeId);
+
+    List<Task> findBySprintIdOrderByCreatedAtAsc(UUID sprintId);
+
+    long countBySprintId(UUID sprintId);
 }

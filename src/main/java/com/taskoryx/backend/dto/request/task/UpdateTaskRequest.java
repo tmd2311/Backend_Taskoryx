@@ -25,13 +25,13 @@ public class UpdateTaskRequest {
     private BigDecimal actualHours;
     private List<UUID> labelIds;
 
-    private UUID versionId;
-
-    private boolean clearVersion = false;
-
     private UUID categoryId;
 
     private boolean clearCategory = false;
+
+    private UUID sprintId;
+
+    private boolean clearSprint = false;
 
     private UUID parentTaskId;
 

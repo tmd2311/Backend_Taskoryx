@@ -1,5 +1,6 @@
 package com.taskoryx.backend.dto.request.project;
 
+import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -16,6 +17,8 @@ public class UpdateProjectRequest {
     private String color;
 
     private String icon;
+    private String projectType;
+    private TemplateConfigDto projectConfig;
     private Boolean isPublic;
     private Boolean isArchived;
 }

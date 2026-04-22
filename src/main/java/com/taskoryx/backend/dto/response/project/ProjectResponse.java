@@ -1,6 +1,8 @@
 package com.taskoryx.backend.dto.response.project;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskoryx.backend.entity.Project;
+import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +23,9 @@ public class ProjectResponse {
     private String key;
     private String icon;
     private String color;
+    private String projectType;
+    private Integer configVersion;
+    private TemplateConfigDto projectConfig;
     private Boolean isPublic;
     private Boolean isArchived;
     private String ownerName;
@@ -32,6 +37,14 @@ public class ProjectResponse {
     private LocalDateTime updatedAt;
 
     public static ProjectResponse from(Project project) {
+        TemplateConfigDto config = null;
+        if (project.getProjectConfig() != null && !project.getProjectConfig().isBlank()) {
+            try {
+                config = new ObjectMapper().readValue(project.getProjectConfig(), TemplateConfigDto.class);
+            } catch (Exception ignored) {
+                config = null;
+            }
+        }
         return ProjectResponse.builder()
                 .id(project.getId())
                 .name(project.getName())
@@ -39,6 +52,9 @@ public class ProjectResponse {
                 .key(project.getKey())
                 .icon(project.getIcon())
                 .color(project.getColor())
+                .projectType(project.getProjectType())
+                .configVersion(project.getConfigVersion())
+                .projectConfig(config)
                 .isPublic(project.getIsPublic())
                 .isArchived(project.getIsArchived())
                 .ownerName(project.getOwner().getFullName())

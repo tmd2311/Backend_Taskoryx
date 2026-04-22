@@ -16,6 +16,7 @@ public class TaskFilterRequest {
 
     private String keyword;
     private UUID columnId;
+    private UUID sprintId;
     private UUID assigneeId;
     private List<Task.TaskPriority> priorities;
     private List<UUID> labelIds;

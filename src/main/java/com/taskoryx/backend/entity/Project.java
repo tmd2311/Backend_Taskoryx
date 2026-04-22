@@ -52,6 +52,16 @@ public class Project {
     @Column(length = 50)
     private String icon;
 
+    @Column(name = "project_type", length = 50)
+    private String projectType;
+
+    @Column(name = "project_config", columnDefinition = "TEXT")
+    private String projectConfig;
+
+    @Column(name = "config_version")
+    @Builder.Default
+    private Integer configVersion = 1;
+
     @Column(nullable = false, length = 7)
     @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "{project.color.pattern}")
     @Builder.Default
@@ -113,6 +123,14 @@ public class Project {
     public void removeBoard(Board board) {
         boards.remove(board);
         board.setProject(null);
+    }
+
+    @PrePersist
+    @PreUpdate
+    public void normalizeConfigVersion() {
+        if (configVersion == null) {
+            configVersion = 1;
+        }
     }
 
     @Override

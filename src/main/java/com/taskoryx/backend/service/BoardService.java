@@ -12,11 +12,13 @@ import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.ProjectPermission;
+import com.taskoryx.backend.entity.Sprint;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.BoardColumnRepository;
 import com.taskoryx.backend.repository.BoardRepository;
+import com.taskoryx.backend.repository.SprintRepository;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.repository.UserRepository;
 import com.taskoryx.backend.security.UserPrincipal;
@@ -36,6 +38,7 @@ public class BoardService {
     private final BoardColumnRepository boardColumnRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final SprintRepository sprintRepository;
     private final ProjectService projectService;
     private final ProjectAuthorizationService projectAuthorizationService;
 
@@ -44,7 +47,7 @@ public class BoardService {
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.BOARD_VIEW);
         return boardRepository.findByProjectIdOrderByPositionAsc(projectId)
                 .stream()
-                .map(BoardResponse::from)
+                .map(this::toBoardResponse)
                 .collect(Collectors.toList());
     }
 
@@ -77,12 +80,17 @@ public class BoardService {
                 })
                 .collect(Collectors.toList());
 
+        Sprint sprint = sprintRepository.findByBoardId(boardId).orElse(null);
+
         return KanbanBoardResponse.builder()
                 .boardId(board.getId())
                 .boardName(board.getName())
                 .projectId(board.getProject().getId())
                 .projectName(board.getProject().getName())
                 .boardType(board.getBoardType())
+                .isSprintBoard(sprint != null)
+                .sprintId(sprint != null ? sprint.getId() : null)
+                .sprintName(sprint != null ? sprint.getName() : null)
                 .ownerId(board.getOwner() != null ? board.getOwner().getId() : null)
                 .columns(columnData)
                 .build();
@@ -94,9 +102,6 @@ public class BoardService {
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         Board.BoardType boardType = request.getBoardType() != null ? request.getBoardType() : Board.BoardType.KANBAN;
-        if (boardType == Board.BoardType.SPRINT) {
-            throw new BadRequestException("Không thể tạo board loại SPRINT thủ công — board này được tạo tự động khi tạo sprint");
-        }
 
         int maxPos = boardRepository.findMaxPositionByProjectId(projectId).orElse(-1);
 
@@ -115,7 +120,7 @@ public class BoardService {
                 .owner(owner)
                 .isDefault(false)
                 .build();
-        return BoardResponse.from(boardRepository.save(board));
+        return toBoardResponse(boardRepository.save(board));
     }
 
     @Transactional
@@ -127,7 +132,7 @@ public class BoardService {
 
         if (request.getName() != null) board.setName(request.getName());
         if (request.getDescription() != null) board.setDescription(request.getDescription());
-        return BoardResponse.from(boardRepository.save(board));
+        return toBoardResponse(boardRepository.save(board));
     }
 
     @Transactional
@@ -136,7 +141,7 @@ public class BoardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
         projectAuthorizationService.requirePermission(board.getProject().getId(), principal.getId(),
                 ProjectPermission.BOARD_UPDATE);
-        if (board.getBoardType() == Board.BoardType.SPRINT) {
+        if (isSprintManagedBoard(board)) {
             throw new BadRequestException("Không thể xóa board sprint thủ công — board này được quản lí tự động theo sprint");
         }
         boardRepository.delete(board);
@@ -150,7 +155,7 @@ public class BoardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
         projectAuthorizationService.requirePermission(board.getProject().getId(), principal.getId(),
                 ProjectPermission.BOARD_UPDATE);
-        if (board.getBoardType() == Board.BoardType.SPRINT) {
+        if (isSprintManagedBoard(board)) {
             throw new BadRequestException("Không thể thêm cột vào board sprint — các cột được quản lí tự động theo trạng thái task");
         }
 
@@ -172,7 +177,7 @@ public class BoardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", columnId));
         projectAuthorizationService.requirePermission(column.getBoard().getProject().getId(), principal.getId(),
                 ProjectPermission.BOARD_UPDATE);
-        if (column.getBoard().getBoardType() == Board.BoardType.SPRINT) {
+        if (isSprintManagedBoard(column.getBoard())) {
             throw new BadRequestException("Không thể chỉnh sửa cột của board sprint");
         }
 
@@ -189,7 +194,7 @@ public class BoardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", columnId));
         projectAuthorizationService.requirePermission(column.getBoard().getProject().getId(), principal.getId(),
                 ProjectPermission.BOARD_UPDATE);
-        if (column.getBoard().getBoardType() == Board.BoardType.SPRINT) {
+        if (isSprintManagedBoard(column.getBoard())) {
             throw new BadRequestException("Không thể di chuyển cột của board sprint");
         }
 
@@ -213,9 +218,23 @@ public class BoardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", columnId));
         projectAuthorizationService.requirePermission(column.getBoard().getProject().getId(), principal.getId(),
                 ProjectPermission.BOARD_UPDATE);
-        if (column.getBoard().getBoardType() == Board.BoardType.SPRINT) {
+        if (isSprintManagedBoard(column.getBoard())) {
             throw new BadRequestException("Không thể xóa cột của board sprint");
         }
         boardColumnRepository.delete(column);
+    }
+
+    private BoardResponse toBoardResponse(Board board) {
+        BoardResponse response = BoardResponse.from(board);
+        sprintRepository.findByBoardId(board.getId()).ifPresent(sprint -> {
+            response.setIsSprintBoard(true);
+            response.setSprintId(sprint.getId());
+            response.setSprintName(sprint.getName());
+        });
+        return response;
+    }
+
+    private boolean isSprintManagedBoard(Board board) {
+        return sprintRepository.findByBoardId(board.getId()).isPresent();
     }
 }

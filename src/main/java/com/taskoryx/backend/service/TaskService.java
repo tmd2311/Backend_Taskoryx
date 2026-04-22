@@ -5,6 +5,7 @@ import com.taskoryx.backend.dto.request.task.MoveTaskRequest;
 import com.taskoryx.backend.dto.request.task.TaskFilterRequest;
 import com.taskoryx.backend.dto.request.task.UpdateTaskRequest;
 import com.taskoryx.backend.dto.request.task.UpdateTaskStatusRequest;
+import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import com.taskoryx.backend.dto.response.task.TaskResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.*;
@@ -16,12 +17,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -38,15 +44,17 @@ public class TaskService {
     private final LabelRepository labelRepository;
     private final ProjectService projectService;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ProjectCapabilityService projectCapabilityService;
     private final NotificationService notificationService;
-    private final VersionRepository versionRepository;
     private final IssueCategoryRepository issueCategoryRepository;
+    private final SprintRepository sprintRepository;
     private final TaskWatcherService taskWatcherService;
 
     @Transactional
     public TaskResponse createTask(UUID projectId, CreateTaskRequest request, UserPrincipal principal) {
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_CREATE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
+        validateCreateRequestAgainstProjectConfig(project, request);
 
         Board board = null;
         BoardColumn column = null;
@@ -66,6 +74,17 @@ public class TaskService {
         if (board != null && column != null && !column.getBoard().getId().equals(board.getId())) {
             throw new BadRequestException("Cột được chọn không thuộc board đã chỉ định");
         }
+        Sprint sprint = null;
+        if (request.getSprintId() != null) {
+            sprint = findSprintInProject(projectId, request.getSprintId());
+            if (sprint.getBoard() == null) {
+                throw new BadRequestException("Sprint chưa có kanban board");
+            }
+            if (board != null && sprint.getBoard() != null && !board.getId().equals(sprint.getBoard().getId())) {
+                throw new BadRequestException("Task thuộc sprint phải dùng đúng kanban của sprint đó");
+            }
+            board = sprint.getBoard();
+        }
 
         User reporter = userRepository.findById(principal.getId()).orElseThrow();
 
@@ -83,11 +102,6 @@ public class TaskService {
                 ? taskRepository.findMaxPositionByColumnId(column.getId())
                         .map(p -> p.add(BigDecimal.valueOf(1000))).orElse(BigDecimal.valueOf(1000))
                 : BigDecimal.ZERO;
-
-        Version version = null;
-        if (request.getVersionId() != null) {
-            version = findVersionInProject(projectId, request.getVersionId());
-        }
 
         IssueCategory category = null;
         if (request.getCategoryId() != null) {
@@ -117,8 +131,8 @@ public class TaskService {
                 .startDate(request.getStartDate())
                 .dueDate(request.getDueDate())
                 .estimatedHours(request.getEstimatedHours())
-                .version(version)
                 .category(category)
+                .sprint(sprint)
                 .parentTask(parentTask)
                 .build();
 
@@ -175,12 +189,9 @@ public class TaskService {
         Sort sort = Sort.by(filter.getSortDir().equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC : Sort.Direction.DESC, filter.getSortBy());
         PageRequest pageable = PageRequest.of(filter.getPage(), filter.getSize(), sort);
-
-        if (filter.getKeyword() != null && !filter.getKeyword().isBlank()) {
-            return taskRepository.searchByProjectId(projectId, filter.getKeyword(), pageable)
-                    .map(TaskSummaryResponse::from);
-        }
-        return taskRepository.findByProjectId(projectId, pageable).map(TaskSummaryResponse::from);
+        validateTaskFilter(projectId, filter);
+        return taskRepository.findAll(buildTaskSpecification(projectId, filter), pageable)
+                .map(TaskSummaryResponse::from);
     }
 
     @Transactional
@@ -189,6 +200,7 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_UPDATE);
+        validateUpdateRequestAgainstProjectConfig(task, request);
 
         if (request.getTitle() != null) task.setTitle(request.getTitle());
         if (request.getDescription() != null) task.setDescription(request.getDescription());
@@ -216,20 +228,20 @@ public class TaskService {
             assignLabels(task, request.getLabelIds());
         }
 
-        // Handle version
-        if (request.isClearVersion()) {
-            task.setVersion(null);
-        } else if (request.getVersionId() != null) {
-            Version ver = findVersionInProject(task.getProject().getId(), request.getVersionId());
-            task.setVersion(ver);
-        }
-
         // Handle category
         if (request.isClearCategory()) {
             task.setCategory(null);
         } else if (request.getCategoryId() != null) {
             IssueCategory cat = findCategoryInProject(task.getProject().getId(), request.getCategoryId());
             task.setCategory(cat);
+        }
+
+        // Handle sprint
+        if (request.isClearSprint()) {
+            detachTaskFromSprint(task);
+        } else if (request.getSprintId() != null) {
+            Sprint sprint = findSprintInProject(task.getProject().getId(), request.getSprintId());
+            attachTaskToSprint(task, sprint);
         }
 
         // Handle parent task
@@ -268,11 +280,12 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_UPDATE);
+        Sprint owningSprint = task.getSprint();
 
         // targetColumnId = null → chuyển về Backlog
         if (request.getTargetColumnId() == null) {
             task.setColumn(null);
-            task.setBoard(null);
+            task.setBoard(owningSprint != null ? owningSprint.getBoard() : null);
             task.setPosition(request.getNewPosition());
             task.setCompletedAt(null);
             return TaskResponse.from(taskRepository.save(task));
@@ -282,6 +295,15 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", request.getTargetColumnId()));
         if (!targetColumn.getBoard().getProject().getId().equals(task.getProject().getId())) {
             throw new BadRequestException("Không thể chuyển task sang cột của dự án khác");
+        }
+        Sprint targetSprint = sprintRepository.findByBoardId(targetColumn.getBoard().getId()).orElse(null);
+        if (targetSprint != null) {
+            if (owningSprint == null || !targetSprint.getId().equals(owningSprint.getId())) {
+                throw new BadRequestException("Task phải được thêm vào sprint trước khi kéo vào kanban của sprint đó");
+            }
+        } else if (owningSprint != null && owningSprint.getBoard() != null
+                && !owningSprint.getBoard().getId().equals(targetColumn.getBoard().getId())) {
+            throw new BadRequestException("Task đang thuộc sprint chỉ có thể di chuyển trong kanban của sprint đó");
         }
 
         // Kiểm tra WIP limit
@@ -323,15 +345,6 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaskSummaryResponse> getBacklog(UUID projectId, UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
-        return taskRepository.findProductBacklog(projectId)
-                .stream()
-                .map(TaskSummaryResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
     public List<TaskSummaryResponse> getMyTasks(UserPrincipal principal) {
         PageRequest pageable = PageRequest.of(0, 50, Sort.by(Sort.Direction.ASC, "dueDate"));
         return taskRepository.findByAssigneeId(principal.getId(), pageable)
@@ -369,6 +382,229 @@ public class TaskService {
         // Full implementation would save TaskLabel entities
     }
 
+    private void validateTaskFilter(UUID projectId, TaskFilterRequest filter) {
+        if (filter.getColumnId() != null) {
+            findColumnInProject(projectId, filter.getColumnId());
+        }
+        if (filter.getSprintId() != null) {
+            findSprintInProject(projectId, filter.getSprintId());
+        }
+        if (filter.getAssigneeId() != null) {
+            findMemberUserInProject(projectId, filter.getAssigneeId(), "assignee");
+        }
+        if (filter.getLabelIds() != null && !filter.getLabelIds().isEmpty()) {
+            validateLabelIdsInProject(projectId, filter.getLabelIds());
+        }
+    }
+
+    private Specification<Task> buildTaskSpecification(UUID projectId, TaskFilterRequest filter) {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("project").get("id"), projectId));
+
+            if (filter.getKeyword() != null && !filter.getKeyword().isBlank()) {
+                String keyword = "%" + filter.getKeyword().trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("title")), keyword),
+                        cb.like(cb.lower(root.get("description")), keyword)
+                ));
+            }
+
+            if (filter.getSprintId() != null) {
+                predicates.add(cb.equal(root.get("sprint").get("id"), filter.getSprintId()));
+            }
+
+            if (filter.getColumnId() != null) {
+                predicates.add(cb.equal(root.get("column").get("id"), filter.getColumnId()));
+            }
+
+            if (filter.getAssigneeId() != null) {
+                predicates.add(cb.equal(root.get("assignee").get("id"), filter.getAssigneeId()));
+            }
+
+            if (filter.getPriorities() != null && !filter.getPriorities().isEmpty()) {
+                predicates.add(root.get("priority").in(filter.getPriorities()));
+            }
+
+            if (filter.getLabelIds() != null && !filter.getLabelIds().isEmpty()) {
+                var taskLabels = root.join("taskLabels");
+                predicates.add(taskLabels.get("label").get("id").in(filter.getLabelIds()));
+            }
+
+            if (filter.getDueDateFrom() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("dueDate"), filter.getDueDateFrom()));
+            }
+
+            if (filter.getDueDateTo() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("dueDate"), filter.getDueDateTo()));
+            }
+
+            if (Boolean.TRUE.equals(filter.getOverdue())) {
+                predicates.add(cb.isNotNull(root.get("dueDate")));
+                predicates.add(cb.lessThan(root.get("dueDate"), LocalDate.now()));
+                predicates.add(cb.isNull(root.get("completedAt")));
+            }
+
+            if (filter.getCompleted() != null) {
+                if (filter.getCompleted()) {
+                    predicates.add(cb.isNotNull(root.get("completedAt")));
+                } else {
+                    predicates.add(cb.isNull(root.get("completedAt")));
+                }
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+    }
+
+    private void validateCreateRequestAgainstProjectConfig(Project project, CreateTaskRequest request) {
+        requireConfiguredTaskField(project, "dueDate", request.getDueDate(), "dueDate");
+        requireConfiguredTaskField(project, "estimatedHours", request.getEstimatedHours(), "estimatedHours");
+        requireConfiguredTaskField(project, "assignee", request.getAssigneeId(), "assignee");
+        requireConfiguredTaskField(project, "labels", request.getLabelIds(), "labels");
+        requireConfiguredTaskField(project, "sprint", request.getSprintId(), "sprint");
+
+        if (request.getSprintId() != null) {
+            projectCapabilityService.requireModule(project, ProjectCapabilityService.MODULE_SPRINT);
+        }
+
+        validateRequiredTaskFields(project,
+                request.getPriority() != null ? request.getPriority() : Task.TaskPriority.MEDIUM,
+                request.getDueDate(),
+                request.getEstimatedHours(),
+                request.getAssigneeId(),
+                request.getLabelIds(),
+                request.getSprintId());
+    }
+
+    private void validateUpdateRequestAgainstProjectConfig(Task task, UpdateTaskRequest request) {
+        requireConfiguredTaskField(task.getProject(), "dueDate", request.getDueDate(), "dueDate");
+        requireConfiguredTaskField(task.getProject(), "estimatedHours", request.getEstimatedHours(), "estimatedHours");
+        requireConfiguredTaskField(task.getProject(), "assignee", request.getAssigneeId(), "assignee");
+        requireConfiguredTaskField(task.getProject(), "labels", request.getLabelIds(), "labels");
+        requireConfiguredTaskField(task.getProject(), "sprint", request.getSprintId(), "sprint");
+
+        if (request.getSprintId() != null || request.isClearSprint()) {
+            projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_SPRINT);
+        }
+        if (request.getActualHours() != null) {
+            projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_TIME_TRACKING);
+        }
+
+        Task.TaskPriority effectivePriority = request.getPriority() != null ? request.getPriority() : task.getPriority();
+        var effectiveDueDate = request.getDueDate() != null ? request.getDueDate() : task.getDueDate();
+        var effectiveEstimatedHours = request.getEstimatedHours() != null ? request.getEstimatedHours() : task.getEstimatedHours();
+        UUID effectiveAssigneeId = request.getAssigneeId() != null
+                ? request.getAssigneeId()
+                : task.getAssignee() != null ? task.getAssignee().getId() : null;
+        List<UUID> effectiveLabelIds = request.getLabelIds() != null
+                ? request.getLabelIds()
+                : task.getTaskLabels().stream()
+                        .map(tl -> tl.getLabel().getId())
+                        .collect(Collectors.toList());
+        UUID effectiveSprintId = request.isClearSprint()
+                ? null
+                : request.getSprintId() != null
+                    ? request.getSprintId()
+                    : task.getSprint() != null ? task.getSprint().getId() : null;
+
+        if (request.isClearSprint() && hasTaskField(task.getProject(), "sprint")) {
+            throw new BadRequestException("Không thể bỏ sprint vì đây là field bắt buộc của dự án");
+        }
+
+        validateRequiredTaskFields(task.getProject(),
+                effectivePriority,
+                effectiveDueDate,
+                effectiveEstimatedHours,
+                effectiveAssigneeId,
+                effectiveLabelIds,
+                effectiveSprintId);
+    }
+
+    private void validateRequiredTaskFields(Project project,
+                                            Task.TaskPriority priority,
+                                            Object dueDate,
+                                            BigDecimal estimatedHours,
+                                            UUID assigneeId,
+                                            List<UUID> labelIds,
+                                            UUID sprintId) {
+        Set<String> fields = getConfiguredTaskFields(project);
+        if (fields.isEmpty()) {
+            return;
+        }
+
+        if (fields.contains("priority") && priority == null) {
+            throw new BadRequestException("Dự án này yêu cầu field priority");
+        }
+        if (fields.contains("dueDate") && dueDate == null) {
+            throw new BadRequestException("Dự án này yêu cầu field dueDate");
+        }
+        if (fields.contains("estimatedHours") && estimatedHours == null) {
+            throw new BadRequestException("Dự án này yêu cầu field estimatedHours");
+        }
+        if (fields.contains("assignee") && assigneeId == null) {
+            throw new BadRequestException("Dự án này yêu cầu field assignee");
+        }
+        if (fields.contains("labels") && (labelIds == null || labelIds.isEmpty())) {
+            throw new BadRequestException("Dự án này yêu cầu field labels");
+        }
+        if (fields.contains("sprint") && sprintId == null) {
+            throw new BadRequestException("Dự án này yêu cầu field sprint");
+        }
+    }
+
+    private void requireConfiguredTaskField(Project project,
+                                            String configuredField,
+                                            Object value,
+                                            String displayField) {
+        if (!isProvided(value)) {
+            return;
+        }
+        Set<String> fields = getConfiguredTaskFields(project);
+        if (fields.isEmpty()) {
+            return;
+        }
+        if (!fields.contains(normalizeField(configuredField))) {
+            throw new BadRequestException("Dự án này không bật field " + displayField + " cho task");
+        }
+    }
+
+    private boolean isProvided(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof String stringValue) {
+            return !stringValue.isBlank();
+        }
+        if (value instanceof List<?> listValue) {
+            return !listValue.isEmpty();
+        }
+        return true;
+    }
+
+    private boolean hasTaskField(Project project, String fieldName) {
+        return getConfiguredTaskFields(project).contains(normalizeField(fieldName));
+    }
+
+    private Set<String> getConfiguredTaskFields(Project project) {
+        TemplateConfigDto config = projectCapabilityService.getProjectConfig(project);
+        if (config == null || config.getTaskFields() == null) {
+            return Set.of();
+        }
+        return config.getTaskFields().stream()
+                .map(this::normalizeField)
+                .collect(Collectors.toSet());
+    }
+
+    private String normalizeField(String fieldName) {
+        return fieldName == null ? "" : fieldName.trim()
+                .toLowerCase(Locale.ROOT)
+                .replace(" ", "")
+                .replace("_", "")
+                .replace("-", "");
+    }
+
     private Board findBoardInProject(UUID projectId, UUID boardId) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Board", "id", boardId));
@@ -387,15 +623,6 @@ public class TaskService {
         return column;
     }
 
-    private Version findVersionInProject(UUID projectId, UUID versionId) {
-        Version version = versionRepository.findById(versionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Version", "id", versionId));
-        if (!version.getProject().getId().equals(projectId)) {
-            throw new BadRequestException("Version không thuộc dự án hiện tại");
-        }
-        return version;
-    }
-
     private IssueCategory findCategoryInProject(UUID projectId, UUID categoryId) {
         IssueCategory category = issueCategoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("IssueCategory", "id", categoryId));
@@ -403,6 +630,51 @@ public class TaskService {
             throw new BadRequestException("Category không thuộc dự án hiện tại");
         }
         return category;
+    }
+
+    private Sprint findSprintInProject(UUID projectId, UUID sprintId) {
+        Sprint sprint = sprintRepository.findById(sprintId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sprint", "id", sprintId));
+        if (!sprint.getProject().getId().equals(projectId)) {
+            throw new BadRequestException("Sprint không thuộc dự án hiện tại");
+        }
+        return sprint;
+    }
+
+    private void attachTaskToSprint(Task task, Sprint sprint) {
+        if (sprint.getBoard() == null) {
+            throw new BadRequestException("Sprint chưa có kanban board");
+        }
+        if (task.getSprint() != null
+                && !task.getSprint().getId().equals(sprint.getId())
+                && (task.getSprint().getStatus() == Sprint.SprintStatus.PLANNED
+                || task.getSprint().getStatus() == Sprint.SprintStatus.ACTIVE)) {
+            throw new BadRequestException("Task đang thuộc một sprint khác đang PLANNED hoặc ACTIVE");
+        }
+        task.setSprint(sprint);
+        task.setBoard(sprint.getBoard());
+        task.setColumn(null);
+        task.setPosition(BigDecimal.ZERO);
+    }
+
+    private void detachTaskFromSprint(Task task) {
+        Board sprintBoard = task.getSprint() != null ? task.getSprint().getBoard() : null;
+        task.setSprint(null);
+        if (sprintBoard != null && task.getBoard() != null && task.getBoard().getId().equals(sprintBoard.getId())) {
+            task.setBoard(null);
+            task.setColumn(null);
+            task.setPosition(BigDecimal.ZERO);
+        }
+    }
+
+    private void validateLabelIdsInProject(UUID projectId, List<UUID> labelIds) {
+        for (UUID labelId : labelIds) {
+            Label label = labelRepository.findById(labelId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Label", "id", labelId));
+            if (!label.getProject().getId().equals(projectId)) {
+                throw new BadRequestException("Label không thuộc dự án hiện tại");
+            }
+        }
     }
 
     private User findMemberUserInProject(UUID projectId, UUID userId, String fieldName) {

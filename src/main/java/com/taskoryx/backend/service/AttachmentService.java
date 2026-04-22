@@ -70,6 +70,7 @@ public class AttachmentService {
     private final UserRepository userRepository;
     private final CommentRepository commentRepository;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ProjectCapabilityService projectCapabilityService;
     private final AppProperties appProperties;
 
     /**
@@ -84,6 +85,7 @@ public class AttachmentService {
     public List<AttachmentResponse> getAttachments(UUID taskId, FileCategory category, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
+        projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_ATTACHMENT);
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_VIEW);
 
@@ -112,6 +114,7 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public Page<AttachmentResponse> getProjectAttachments(UUID projectId, FileCategory category,
                                                            Pageable pageable, UserPrincipal principal) {
+        projectCapabilityService.requireModule(projectId, ProjectCapabilityService.MODULE_ATTACHMENT, principal.getId());
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
 
         if (category == null) {
@@ -144,6 +147,7 @@ public class AttachmentService {
     public AttachmentStatsResponse getTaskStats(UUID taskId, UserPrincipal principal) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
+        projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_ATTACHMENT);
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_VIEW);
 
@@ -158,6 +162,7 @@ public class AttachmentService {
      */
     @Transactional(readOnly = true)
     public AttachmentStatsResponse getProjectStats(UUID projectId, UserPrincipal principal) {
+        projectCapabilityService.requireModule(projectId, ProjectCapabilityService.MODULE_ATTACHMENT, principal.getId());
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
 
         List<AttachmentCategoryStatsProjection> projections =
@@ -177,6 +182,7 @@ public class AttachmentService {
     public ResponseEntity<Resource> serveFile(UUID attachmentId, boolean inline, UserPrincipal principal) {
         Attachment attachment = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment", "id", attachmentId));
+        projectCapabilityService.requireModule(attachment.getTask().getProject(), ProjectCapabilityService.MODULE_ATTACHMENT);
         projectAuthorizationService.requirePermission(attachment.getTask().getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_VIEW);
 
@@ -209,6 +215,7 @@ public class AttachmentService {
                                                 UserPrincipal principal) throws IOException {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
+        projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_ATTACHMENT);
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.ATTACHMENT_MANAGE);
 
@@ -258,6 +265,7 @@ public class AttachmentService {
     public List<AttachmentResponse> getCommentAttachments(UUID commentId, UserPrincipal principal) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentId));
+        projectCapabilityService.requireModule(comment.getTask().getProject(), ProjectCapabilityService.MODULE_ATTACHMENT);
         projectAuthorizationService.requirePermission(comment.getTask().getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_VIEW);
         return attachmentRepository.findByCommentIdOrderByCreatedAtAsc(commentId)
@@ -268,6 +276,7 @@ public class AttachmentService {
     public void deleteAttachment(UUID attachmentId, UserPrincipal principal) {
         Attachment attachment = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment", "id", attachmentId));
+        projectCapabilityService.requireModule(attachment.getTask().getProject(), ProjectCapabilityService.MODULE_ATTACHMENT);
 
         if (!attachment.getUploadedBy().getId().equals(principal.getId())
                 && !projectAuthorizationService.hasPermission(attachment.getTask().getProject().getId(),

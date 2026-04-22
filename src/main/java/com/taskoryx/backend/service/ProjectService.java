@@ -1,5 +1,7 @@
 package com.taskoryx.backend.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskoryx.backend.dto.request.project.AddMemberRequest;
 import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
 import com.taskoryx.backend.dto.request.project.UpdateMemberRoleRequest;
@@ -7,6 +9,7 @@ import com.taskoryx.backend.dto.request.project.UpdateProjectRequest;
 import com.taskoryx.backend.dto.response.comment.MentionedUserInfo;
 import com.taskoryx.backend.dto.response.project.ProjectMemberResponse;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
+import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.Project;
@@ -42,6 +45,8 @@ public class ProjectService {
     private final BoardColumnRepository boardColumnRepository;
     private final TaskRepository taskRepository;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ProjectCapabilityService projectCapabilityService;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<ProjectResponse> getMyProjects(UserPrincipal principal) {
@@ -71,6 +76,9 @@ public class ProjectService {
                 .owner(owner)
                 .color(request.getColor() != null ? request.getColor() : "#1976d2")
                 .icon(request.getIcon())
+                .projectType(normalizeProjectType(request.getProjectType()))
+                .projectConfig(serializeProjectConfig(request.getProjectConfig()))
+                .configVersion(1)
                 .isPublic(request.getIsPublic() != null ? request.getIsPublic() : false)
                 .isArchived(false)
                 .build();
@@ -109,6 +117,11 @@ public class ProjectService {
         if (request.getDescription() != null) project.setDescription(request.getDescription());
         if (request.getColor() != null) project.setColor(request.getColor());
         if (request.getIcon() != null) project.setIcon(request.getIcon());
+        if (request.getProjectType() != null) project.setProjectType(normalizeProjectType(request.getProjectType()));
+        if (request.getProjectConfig() != null) {
+            project.setProjectConfig(serializeProjectConfig(request.getProjectConfig()));
+            project.setConfigVersion(project.getConfigVersion() != null ? project.getConfigVersion() + 1 : 1);
+        }
         if (request.getIsPublic() != null) project.setIsPublic(request.getIsPublic());
         if (request.getIsArchived() != null) project.setIsArchived(request.getIsArchived());
 
@@ -250,6 +263,31 @@ public class ProjectService {
                     .isCompleted(completedFlags[i])
                     .build();
             boardColumnRepository.save(column);
+        }
+    }
+
+    private String normalizeProjectType(String projectType) {
+        if (projectType == null || projectType.isBlank()) {
+            return null;
+        }
+        return projectType.trim()
+                .toUpperCase()
+                .replace(' ', '_')
+                .replace('-', '_');
+    }
+
+    private String serializeProjectConfig(Object config) {
+        if (config == null) {
+            return null;
+        }
+        try {
+            TemplateConfigDto sanitizedConfig = projectCapabilityService.sanitizeProjectConfig(
+                    objectMapper.convertValue(config, TemplateConfigDto.class));
+            return objectMapper.writeValueAsString(sanitizedConfig);
+        } catch (JsonProcessingException e) {
+            throw new BadRequestException("Cấu hình project không hợp lệ");
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Cấu hình project không hợp lệ");
         }
     }
 }

@@ -40,6 +40,10 @@ public class TaskResponse {
     private UUID boardId;
     private String boardName;
 
+    // Sprint info
+    private UUID sprintId;
+    private String sprintName;
+
     // Column info
     private UUID columnId;
     private String columnName;
@@ -71,10 +75,6 @@ public class TaskResponse {
 
     // Labels
     private List<LabelResponse> labels;
-
-    // Version info
-    private UUID versionId;
-    private String versionName;
 
     // Category info
     private UUID categoryId;
@@ -122,6 +122,8 @@ public class TaskResponse {
                 .projectKey(task.getProject().getKey())
                 .boardId(task.getBoard() != null ? task.getBoard().getId() : null)
                 .boardName(task.getBoard() != null ? task.getBoard().getName() : null)
+                .sprintId(task.getSprint() != null ? task.getSprint().getId() : null)
+                .sprintName(task.getSprint() != null ? task.getSprint().getName() : null)
                 .columnId(task.getColumn() != null ? task.getColumn().getId() : null)
                 .columnName(task.getColumn() != null ? task.getColumn().getName() : null)
                 .assigneeId(task.getAssignee() != null ? task.getAssignee().getId() : null)
@@ -142,8 +144,6 @@ public class TaskResponse {
                 .labels(task.getTaskLabels().stream()
                         .map(tl -> LabelResponse.from(tl.getLabel()))
                         .collect(Collectors.toList()))
-                .versionId(task.getVersion() != null ? task.getVersion().getId() : null)
-                .versionName(task.getVersion() != null ? task.getVersion().getName() : null)
                 .categoryId(task.getCategory() != null ? task.getCategory().getId() : null)
                 .categoryName(task.getCategory() != null ? task.getCategory().getName() : null)
                 .watcherCount(task.getWatchers().size())

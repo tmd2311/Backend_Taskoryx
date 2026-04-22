@@ -26,13 +26,12 @@ import java.util.UUID;
 /**
  * REST Controller cho Task Management
  *
- * POST   /api/projects/{projectId}/tasks           - Tạo task mới (boardId/columnId optional → backlog)
+ * POST   /api/projects/{projectId}/tasks           - Tạo task mới
  * GET    /api/projects/{projectId}/tasks           - Danh sách tasks (có lọc/tìm kiếm)
- * GET    /api/projects/{projectId}/backlog         - Danh sách tasks trong Backlog
  * GET    /api/tasks/{id}                           - Chi tiết task
  * PUT    /api/tasks/{id}                           - Cập nhật task
  * PATCH  /api/tasks/{id}/status                    - Cập nhật trạng thái task
- * PATCH  /api/tasks/{id}/move                      - Di chuyển task (drag & drop, targetColumnId null → backlog)
+ * PATCH  /api/tasks/{id}/move                      - Di chuyển task (drag & drop)
  * DELETE /api/tasks/{id}                           - Xóa task
  * GET    /api/tasks/my                             - Tasks được giao cho tôi
  */
@@ -62,14 +61,6 @@ public class TaskController {
             @ModelAttribute TaskFilterRequest filter) {
         var result = taskService.getTasksByProject(projectId, filter, principal);
         return ResponseEntity.ok(ApiResponse.success(PagedResponse.of(result)));
-    }
-
-    @GetMapping("/projects/{projectId}/backlog")
-    @Operation(summary = "Lấy danh sách tasks trong Backlog (chưa được đưa vào board nào)")
-    public ResponseEntity<ApiResponse<List<TaskSummaryResponse>>> getBacklog(
-            @PathVariable UUID projectId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success(taskService.getBacklog(projectId, principal)));
     }
 
     @GetMapping("/tasks/{id}")

@@ -39,6 +39,7 @@ public class TimeTrackingService {
     private final TimeTrackingRepository timeTrackingRepository;
     private final TaskRepository taskRepository;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ProjectCapabilityService projectCapabilityService;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
 
@@ -47,6 +48,7 @@ public class TimeTrackingService {
         Task task = taskRepository.findById(request.getTaskId())
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", request.getTaskId()));
 
+        projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_TIME_TRACKING);
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TIME_TRACKING_MANAGE);
 
@@ -76,6 +78,7 @@ public class TimeTrackingService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
+        projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_TIME_TRACKING);
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TIME_TRACKING_VIEW);
 
@@ -111,6 +114,7 @@ public class TimeTrackingService {
                                                  UserPrincipal principal) {
         TimeTracking entry = timeTrackingRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("TimeTracking", "id", entryId));
+        projectCapabilityService.requireModule(entry.getTask().getProject(), ProjectCapabilityService.MODULE_TIME_TRACKING);
         projectAuthorizationService.requirePermission(entry.getTask().getProject().getId(), principal.getId(),
                 ProjectPermission.TIME_TRACKING_MANAGE);
 
@@ -141,6 +145,7 @@ public class TimeTrackingService {
     public void deleteTimeEntry(UUID entryId, UserPrincipal principal) {
         TimeTracking entry = timeTrackingRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("TimeTracking", "id", entryId));
+        projectCapabilityService.requireModule(entry.getTask().getProject(), ProjectCapabilityService.MODULE_TIME_TRACKING);
         projectAuthorizationService.requirePermission(entry.getTask().getProject().getId(), principal.getId(),
                 ProjectPermission.TIME_TRACKING_MANAGE);
 
@@ -161,6 +166,7 @@ public class TimeTrackingService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
+        projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_TIME_TRACKING);
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TIME_TRACKING_VIEW);
 
@@ -382,6 +388,7 @@ public class TimeTrackingService {
                                                            LocalDate end, UserPrincipal principal) {
         var project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
+        projectCapabilityService.requireModule(project, ProjectCapabilityService.MODULE_TIME_TRACKING);
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.REPORT_VIEW);
 
         // By-member

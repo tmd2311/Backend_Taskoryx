@@ -1,5 +1,6 @@
 package com.taskoryx.backend.dto.request.project;
 
+import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -22,5 +23,7 @@ public class CreateProjectRequest {
     private String color;
 
     private String icon;
+    private String projectType;
+    private TemplateConfigDto projectConfig;
     private Boolean isPublic = false;
 }

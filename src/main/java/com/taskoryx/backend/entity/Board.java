@@ -78,7 +78,6 @@ public class Board {
     public enum BoardType {
         KANBAN,
         SCRUM,
-        SPRINT,
         PERSONAL
     }
 

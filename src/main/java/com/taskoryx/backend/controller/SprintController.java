@@ -4,6 +4,7 @@ import com.taskoryx.backend.dto.request.sprint.CreateSprintRequest;
 import com.taskoryx.backend.dto.request.sprint.SprintTaskRequest;
 import com.taskoryx.backend.dto.request.sprint.UpdateSprintRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
+import com.taskoryx.backend.dto.response.board.KanbanBoardResponse;
 import com.taskoryx.backend.dto.response.sprint.SprintResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.security.UserPrincipal;
@@ -26,13 +27,13 @@ import java.util.UUID;
  * POST   /api/projects/{projectId}/sprints      - Tạo sprint mới
  * GET    /api/projects/{projectId}/sprints      - Danh sách sprints trong project
  * GET    /api/sprints/{id}                      - Chi tiết sprint (kèm tasks)
+ * GET    /api/sprints/{id}/kanban               - Kanban trực tiếp của sprint
  * PUT    /api/sprints/{id}                      - Cập nhật sprint
  * POST   /api/sprints/{id}/start               - Bắt đầu sprint
  * POST   /api/sprints/{id}/complete            - Hoàn thành sprint
  * DELETE /api/sprints/{id}                     - Xóa sprint (chỉ PLANNED)
  * POST   /api/sprints/{id}/tasks               - Thêm task vào sprint
  * DELETE /api/sprints/{id}/tasks/{taskId}      - Xóa task khỏi sprint
- * GET    /api/sprints/{id}/backlog             - Tasks trong sprint chưa kéo lên board (Sprint Backlog)
  */
 @RestController
 @RequiredArgsConstructor
@@ -68,6 +69,15 @@ public class SprintController {
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(
                 sprintService.getSprint(id, principal)));
+    }
+
+    @GetMapping("/sprints/{id}/kanban")
+    @Operation(summary = "Lấy kanban trực tiếp của sprint")
+    public ResponseEntity<ApiResponse<KanbanBoardResponse>> getSprintKanban(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                sprintService.getSprintKanban(id, principal)));
     }
 
     @PutMapping("/sprints/{id}")
@@ -127,12 +137,4 @@ public class SprintController {
                 sprintService.removeTaskFromSprint(id, taskId, principal)));
     }
 
-    @GetMapping("/sprints/{id}/backlog")
-    @Operation(summary = "Lấy Sprint Backlog - tasks trong sprint chưa được kéo lên board")
-    public ResponseEntity<ApiResponse<List<TaskSummaryResponse>>> getSprintBacklog(
-            @PathVariable UUID id,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.success(
-                sprintService.getSprintBacklog(id, principal)));
-    }
 }

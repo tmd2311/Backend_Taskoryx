@@ -24,6 +24,9 @@ public class BoardResponse {
     private Integer position;
     private Board.BoardType boardType;
     private Boolean isDefault;
+    private Boolean isSprintBoard;
+    private UUID sprintId;
+    private String sprintName;
     private UUID ownerId;
     private String ownerName;
     private List<BoardColumnResponse> columns;
@@ -39,6 +42,7 @@ public class BoardResponse {
                 .position(board.getPosition())
                 .boardType(board.getBoardType())
                 .isDefault(board.getIsDefault())
+                .isSprintBoard(false)
                 .ownerId(board.getOwner() != null ? board.getOwner().getId() : null)
                 .ownerName(board.getOwner() != null ? board.getOwner().getFullName() : null)
                 .columns(board.getColumns().stream()

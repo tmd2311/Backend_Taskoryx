@@ -23,8 +23,6 @@ public class GanttTaskItem {
     private String assigneeAvatar;
     private int percentComplete;
     private List<UUID> dependsOnTaskIds;
-    private UUID versionId;
-    private String versionName;
     private UUID categoryId;
     private String categoryName;
     private boolean overdue;
@@ -53,8 +51,6 @@ public class GanttTaskItem {
                 .dependsOnTaskIds(task.getDependencies().stream()
                         .map(dep -> dep.getDependsOnTask().getId())
                         .collect(Collectors.toList()))
-                .versionId(task.getVersion() != null ? task.getVersion().getId() : null)
-                .versionName(task.getVersion() != null ? task.getVersion().getName() : null)
                 .categoryId(task.getCategory() != null ? task.getCategory().getId() : null)
                 .categoryName(task.getCategory() != null ? task.getCategory().getName() : null)
                 .overdue(task.isOverdue())

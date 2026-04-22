@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -41,28 +42,36 @@ public class SprintResponse {
     private List<TaskSummaryResponse> tasks;
 
     public static SprintResponse from(Sprint sprint) {
-        return from(sprint, false);
+        return from(sprint, List.of(), false);
     }
 
     public static SprintResponse fromWithTasks(Sprint sprint) {
-        return from(sprint, true);
+        return from(sprint, sprint.getTasks(), true);
     }
 
-    private static SprintResponse from(Sprint sprint, boolean includeTasks) {
-        int taskCount = sprint.getTasks().size();
+    public static SprintResponse from(Sprint sprint, Collection<Task> sprintTasks) {
+        return from(sprint, sprintTasks, false);
+    }
 
-        int completedTaskCount = (int) sprint.getTasks().stream()
+    public static SprintResponse fromWithTasks(Sprint sprint, Collection<Task> sprintTasks) {
+        return from(sprint, sprintTasks, true);
+    }
+
+    private static SprintResponse from(Sprint sprint, Collection<Task> sprintTasks, boolean includeTasks) {
+        int taskCount = sprintTasks.size();
+
+        int completedTaskCount = (int) sprintTasks.stream()
                 .filter(t -> t.getStatus() == Task.TaskStatus.DONE
                           || t.getStatus() == Task.TaskStatus.RESOLVED)
                 .count();
 
-        int inProgressTaskCount = (int) sprint.getTasks().stream()
+        int inProgressTaskCount = (int) sprintTasks.stream()
                 .filter(t -> t.getStatus() == Task.TaskStatus.IN_PROGRESS
                           || t.getStatus() == Task.TaskStatus.IN_REVIEW)
                 .count();
 
         List<TaskSummaryResponse> taskList = includeTasks
-                ? sprint.getTasks().stream()
+                ? sprintTasks.stream()
                         .map(TaskSummaryResponse::from)
                         .collect(Collectors.toList())
                 : null;

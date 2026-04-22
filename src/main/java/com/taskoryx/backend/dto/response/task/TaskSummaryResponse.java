@@ -25,6 +25,8 @@ public class TaskSummaryResponse {
     private Task.TaskPriority priority;
     private Task.TaskStatus status;
     private BigDecimal position;
+    private UUID sprintId;
+    private String sprintName;
     private UUID columnId;
     private UUID assigneeId;
     private String assigneeName;
@@ -42,6 +44,8 @@ public class TaskSummaryResponse {
                 .priority(task.getPriority())
                 .status(task.getStatus())
                 .position(task.getPosition())
+                .sprintId(task.getSprint() != null ? task.getSprint().getId() : null)
+                .sprintName(task.getSprint() != null ? task.getSprint().getName() : null)
                 .columnId(task.getColumn() != null ? task.getColumn().getId() : null)
                 .assigneeId(task.getAssignee() != null ? task.getAssignee().getId() : null)
                 .assigneeName(task.getAssignee() != null ? task.getAssignee().getFullName() : null)

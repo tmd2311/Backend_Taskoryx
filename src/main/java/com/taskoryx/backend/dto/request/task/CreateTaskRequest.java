@@ -34,9 +34,9 @@ public class CreateTaskRequest {
 
     private List<UUID> labelIds;
 
-    private UUID versionId;
-
     private UUID categoryId;
+
+    private UUID sprintId;
 
     private UUID parentTaskId;
 }

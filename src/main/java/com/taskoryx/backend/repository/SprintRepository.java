@@ -25,4 +25,6 @@ public interface SprintRepository extends JpaRepository<Sprint, UUID> {
 
     @Query("SELECT s FROM Sprint s WHERE s.project.id = :projectId AND s.status = 'ACTIVE'")
     Optional<Sprint> findActiveSprintByProjectId(@Param("projectId") UUID projectId);
+
+    Optional<Sprint> findByBoardId(UUID boardId);
 }

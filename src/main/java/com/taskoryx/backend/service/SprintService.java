@@ -2,6 +2,7 @@ package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.dto.request.sprint.CreateSprintRequest;
 import com.taskoryx.backend.dto.request.sprint.UpdateSprintRequest;
+import com.taskoryx.backend.dto.response.board.KanbanBoardResponse;
 import com.taskoryx.backend.dto.response.sprint.SprintResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.Board;
@@ -37,11 +38,14 @@ public class SprintService {
     private final BoardRepository boardRepository;
     private final BoardColumnRepository boardColumnRepository;
     private final ProjectService projectService;
+    private final BoardService boardService;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ProjectCapabilityService projectCapabilityService;
 
     // ========== CREATE ==========
 
     public SprintResponse createSprint(UUID projectId, CreateSprintRequest request, UserPrincipal principal) {
+        projectCapabilityService.requireModule(projectId, ProjectCapabilityService.MODULE_SPRINT, principal.getId());
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.SPRINT_MANAGE);
         Project project = projectService.findProjectWithAccess(projectId, principal.getId());
 
@@ -56,7 +60,7 @@ public class SprintService {
         Board sprintBoard = Board.builder()
                 .project(project)
                 .name(request.getName())
-                .boardType(Board.BoardType.SPRINT)
+                .boardType(Board.BoardType.SCRUM)
                 .position(maxPos + 1)
                 .isDefault(false)
                 .build();
@@ -74,7 +78,7 @@ public class SprintService {
                 .build();
 
         sprint = sprintRepository.save(sprint);
-        return SprintResponse.fromWithTasks(sprint);
+        return SprintResponse.fromWithTasks(sprint, List.of());
     }
 
     /** Tạo 6 cột chuẩn theo TaskStatus cho sprint board */
@@ -105,25 +109,40 @@ public class SprintService {
 
     @Transactional(readOnly = true)
     public List<SprintResponse> getSprints(UUID projectId, UserPrincipal principal) {
+        projectCapabilityService.requireModule(projectId, ProjectCapabilityService.MODULE_SPRINT, principal.getId());
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.BOARD_VIEW);
         return sprintRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
                 .stream()
-                .map(SprintResponse::from)
+                .map(sprint -> SprintResponse.from(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprint.getId())))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public SprintResponse getSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
         projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
                 ProjectPermission.BOARD_VIEW);
-        return SprintResponse.fromWithTasks(sprint);
+        return SprintResponse.fromWithTasks(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
+    }
+
+    @Transactional(readOnly = true)
+    public KanbanBoardResponse getSprintKanban(UUID sprintId, UserPrincipal principal) {
+        Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
+        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
+                ProjectPermission.BOARD_VIEW);
+        if (sprint.getBoard() == null) {
+            throw new BadRequestException("Sprint chưa có kanban board");
+        }
+        return boardService.getKanbanBoard(sprint.getBoard().getId(), principal);
     }
 
     // ========== UPDATE ==========
 
     public SprintResponse updateSprint(UUID sprintId, UpdateSprintRequest request, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
         projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
                 ProjectPermission.SPRINT_MANAGE);
 
@@ -134,8 +153,7 @@ public class SprintService {
 
         if (request.getName() != null && !request.getName().isBlank()) {
             sprint.setName(request.getName());
-            // Đồng bộ tên board với tên sprint
-            if (sprint.getBoard() != null && sprint.getBoard().getBoardType() == Board.BoardType.SPRINT) {
+            if (sprint.getBoard() != null) {
                 sprint.getBoard().setName(request.getName());
                 boardRepository.save(sprint.getBoard());
             }
@@ -155,13 +173,14 @@ public class SprintService {
         if (request.getEndDate()   != null) sprint.setEndDate(request.getEndDate());
 
         sprint = sprintRepository.save(sprint);
-        return SprintResponse.fromWithTasks(sprint);
+        return SprintResponse.fromWithTasks(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
     // ========== START SPRINT ==========
 
     public SprintResponse startSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
         projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
                 ProjectPermission.SPRINT_MANAGE);
 
@@ -179,13 +198,14 @@ public class SprintService {
         }
 
         sprint = sprintRepository.save(sprint);
-        return SprintResponse.fromWithTasks(sprint);
+        return SprintResponse.fromWithTasks(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
     // ========== COMPLETE SPRINT ==========
 
     public SprintResponse completeSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
         projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
                 ProjectPermission.SPRINT_MANAGE);
 
@@ -197,26 +217,14 @@ public class SprintService {
         sprint.setCompletedAt(LocalDateTime.now());
 
         sprint = sprintRepository.save(sprint);
-        return SprintResponse.fromWithTasks(sprint);
-    }
-
-    // ========== SPRINT BACKLOG ==========
-
-    @Transactional(readOnly = true)
-    public List<TaskSummaryResponse> getSprintBacklog(UUID sprintId, UserPrincipal principal) {
-        Sprint sprint = findSprintById(sprintId);
-        projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
-                ProjectPermission.BOARD_VIEW);
-        return sprint.getTasks().stream()
-                .filter(t -> t.getColumn() == null)
-                .map(TaskSummaryResponse::from)
-                .collect(Collectors.toList());
+        return SprintResponse.fromWithTasks(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
     // ========== DELETE ==========
 
     public void deleteSprint(UUID sprintId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
         projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
                 ProjectPermission.SPRINT_MANAGE);
 
@@ -226,10 +234,11 @@ public class SprintService {
 
         // Xóa sprint board đi kèm
         Board board = sprint.getBoard();
+        clearTasksFromSprintBoard(sprint, board);
         sprint.setBoard(null);
         sprintRepository.save(sprint);
 
-        if (board != null && board.getBoardType() == Board.BoardType.SPRINT) {
+        if (board != null) {
             boardRepository.delete(board);
         }
 
@@ -240,6 +249,7 @@ public class SprintService {
 
     public SprintResponse addTaskToSprint(UUID sprintId, UUID taskId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
         projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
                 ProjectPermission.SPRINT_MANAGE);
 
@@ -249,23 +259,32 @@ public class SprintService {
         if (!task.getProject().getId().equals(sprint.getProject().getId())) {
             throw new BadRequestException("Task không thuộc dự án này");
         }
+        ensureTaskNotInAnotherActiveOrPlannedSprint(sprint, task);
 
-        sprint.getTasks().add(task);
-        sprint = sprintRepository.save(sprint);
-        return SprintResponse.fromWithTasks(sprint);
+        task.setSprint(sprint);
+        attachTaskToSprintBoard(sprint, task);
+        taskRepository.save(task);
+        Sprint refreshedSprint = findSprintById(sprintId);
+        return SprintResponse.fromWithTasks(refreshedSprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
     public SprintResponse removeTaskFromSprint(UUID sprintId, UUID taskId, UserPrincipal principal) {
         Sprint sprint = findSprintById(sprintId);
+        projectCapabilityService.requireModule(sprint.getProject(), ProjectCapabilityService.MODULE_SPRINT);
         projectAuthorizationService.requirePermission(sprint.getProject().getId(), principal.getId(),
                 ProjectPermission.SPRINT_MANAGE);
 
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
-        sprint.getTasks().remove(task);
-        sprint = sprintRepository.save(sprint);
-        return SprintResponse.fromWithTasks(sprint);
+        if (task.getSprint() == null || !task.getSprint().getId().equals(sprintId)) {
+            throw new BadRequestException("Task không thuộc sprint này");
+        }
+        task.setSprint(null);
+        detachTaskFromSprintBoard(sprint, task);
+        taskRepository.save(task);
+        Sprint refreshedSprint = findSprintById(sprintId);
+        return SprintResponse.fromWithTasks(refreshedSprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
     // ========== HELPERS ==========
@@ -273,5 +292,46 @@ public class SprintService {
     private Sprint findSprintById(UUID sprintId) {
         return sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sprint", "id", sprintId));
+    }
+
+    private void ensureTaskNotInAnotherActiveOrPlannedSprint(Sprint sprint, Task task) {
+        if (task.getSprint() != null
+                && !task.getSprint().getId().equals(sprint.getId())
+                && (task.getSprint().getStatus() == Sprint.SprintStatus.PLANNED
+                || task.getSprint().getStatus() == Sprint.SprintStatus.ACTIVE)) {
+            throw new BadRequestException("Task đang thuộc một sprint khác đang PLANNED hoặc ACTIVE");
+        }
+    }
+
+    private void attachTaskToSprintBoard(Sprint sprint, Task task) {
+        if (sprint.getBoard() == null) {
+            return;
+        }
+        task.setBoard(sprint.getBoard());
+        task.setColumn(null);
+    }
+
+    private void detachTaskFromSprintBoard(Sprint sprint, Task task) {
+        if (sprint.getBoard() == null) {
+            return;
+        }
+        if (task.getBoard() != null && task.getBoard().getId().equals(sprint.getBoard().getId())) {
+            task.setBoard(null);
+            task.setColumn(null);
+        }
+    }
+
+    private void clearTasksFromSprintBoard(Sprint sprint, Board board) {
+        if (board == null) {
+            return;
+        }
+        taskRepository.findBySprintIdOrderByCreatedAtAsc(sprint.getId()).forEach(task -> {
+            task.setSprint(null);
+            if (task.getBoard() != null && task.getBoard().getId().equals(board.getId())) {
+                task.setBoard(null);
+                task.setColumn(null);
+            }
+            taskRepository.save(task);
+        });
     }
 }

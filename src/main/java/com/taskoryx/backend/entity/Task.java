@@ -30,7 +30,6 @@ import java.util.UUID;
         @Index(name = "idx_tasks_reporter", columnList = "reporter_id"),
         @Index(name = "idx_tasks_due_date", columnList = "dueDate"),
         @Index(name = "idx_tasks_priority", columnList = "priority"),
-        @Index(name = "idx_tasks_version", columnList = "version_id"),
         @Index(name = "idx_tasks_category", columnList = "category_id")
     }
 )
@@ -138,16 +137,16 @@ public class Task {
     private Set<TaskDependency> dependents = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "version_id", foreignKey = @ForeignKey(name = "fk_tasks_version"))
-    private Version version;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", foreignKey = @ForeignKey(name = "fk_tasks_category"))
     private IssueCategory category;
 
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private Set<TaskWatcher> watchers = new HashSet<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sprint_id", foreignKey = @ForeignKey(name = "fk_tasks_sprint"))
+    private Sprint sprint;
 
     // Self-referencing parent-child relationship
     @ManyToOne(fetch = FetchType.LAZY)

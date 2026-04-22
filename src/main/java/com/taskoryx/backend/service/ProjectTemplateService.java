@@ -33,6 +33,7 @@ public class ProjectTemplateService {
     private final BoardRepository boardRepository;
     private final BoardColumnRepository boardColumnRepository;
     private final UserRepository userRepository;
+    private final ProjectCapabilityService projectCapabilityService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -65,6 +66,8 @@ public class ProjectTemplateService {
         User owner = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", principal.getId()));
 
+        TemplateConfigDto config = parseTemplateConfig(template);
+
         // Create project
         Project project = Project.builder()
                 .name(request.getName())
@@ -73,6 +76,9 @@ public class ProjectTemplateService {
                 .owner(owner)
                 .color(request.getColor() != null ? request.getColor() : (template.getColor() != null ? template.getColor() : "#1976d2"))
                 .icon(template.getIcon())
+                .projectType(resolveProjectType(template, config))
+                .projectConfig(serializeProjectConfig(config))
+                .configVersion(1)
                 .isPublic(request.getIsPublic() != null ? request.getIsPublic() : false)
                 .isArchived(false)
                 .build();
@@ -91,15 +97,14 @@ public class ProjectTemplateService {
                 .project(project)
                 .name("Main Board")
                 .position(0)
+                .boardType(resolveBoardType(config))
                 .isDefault(true)
                 .build();
         board = boardRepository.save(board);
 
         // Parse and create columns from template config
-        if (template.getColumnsConfig() != null) {
+        if (config != null) {
             try {
-                TemplateConfigDto config = objectMapper.readValue(
-                        template.getColumnsConfig(), TemplateConfigDto.class);
                 List<TemplateColumnConfigDto> columns = config.getColumns();
                 if (columns == null || columns.isEmpty()) {
                     createDefaultColumns(board);
@@ -112,6 +117,8 @@ public class ProjectTemplateService {
                                 .position(i)
                                 .color(col.getColor() != null ? col.getColor() : "#6b7280")
                                 .isCompleted(Boolean.TRUE.equals(col.getIsCompleted()))
+                                .mappedStatus(col.getMappedStatus())
+                                .taskLimit(col.getTaskLimit())
                                 .build();
                         boardColumnRepository.save(column);
                     }
@@ -144,6 +151,64 @@ public class ProjectTemplateService {
         }
     }
 
+    private TemplateConfigDto parseTemplateConfig(ProjectTemplate template) {
+        if (template.getColumnsConfig() == null || template.getColumnsConfig().isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(template.getColumnsConfig(), TemplateConfigDto.class);
+        } catch (Exception e) {
+            try {
+                List<TemplateColumnConfigDto> cols = objectMapper.readValue(
+                        template.getColumnsConfig(),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, TemplateColumnConfigDto.class));
+                return TemplateConfigDto.builder().columns(cols).build();
+            } catch (Exception ignored) {
+                log.warn("Failed to parse template config for template {}", template.getId());
+                return null;
+            }
+        }
+    }
+
+    private String serializeProjectConfig(TemplateConfigDto config) {
+        if (config == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(projectCapabilityService.sanitizeProjectConfig(config));
+        } catch (Exception e) {
+            throw new BadRequestException("Không thể lưu cấu hình project từ template");
+        }
+    }
+
+    private String resolveProjectType(ProjectTemplate template, TemplateConfigDto config) {
+        if (config != null && config.getProjectType() != null && !config.getProjectType().isBlank()) {
+            return normalizeProjectType(config.getProjectType());
+        }
+        return normalizeProjectType(template.getCategory());
+    }
+
+    private Board.BoardType resolveBoardType(TemplateConfigDto config) {
+        if (config == null || config.getBoardType() == null || config.getBoardType().isBlank()) {
+            return Board.BoardType.KANBAN;
+        }
+        try {
+            return Board.BoardType.valueOf(config.getBoardType().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return Board.BoardType.KANBAN;
+        }
+    }
+
+    private String normalizeProjectType(String projectType) {
+        if (projectType == null || projectType.isBlank()) {
+            return null;
+        }
+        return projectType.trim()
+                .toUpperCase()
+                .replace(' ', '_')
+                .replace('-', '_');
+    }
+
     // Initialize default system templates on startup
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
@@ -158,7 +223,9 @@ public class ProjectTemplateService {
         createSystemTemplate("Phát triển phần mềm",
             "Template cho dự án phát triển phần mềm theo Agile/Scrum",
             "Software", "💻", "#1976d2",
-            "{\"boardType\":\"SCRUM\"," +
+            "{\"projectType\":\"SOFTWARE\"," +
+            "\"boardType\":\"SCRUM\"," +
+            "\"enabledModules\":[\"SPRINT\",\"TIME_TRACKING\"]," +
             "\"columns\":[" +
               "{\"name\":\"Backlog\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
               "{\"name\":\"Cần làm\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
@@ -171,7 +238,9 @@ public class ProjectTemplateService {
         createSystemTemplate("Dự án Marketing",
             "Template cho chiến dịch marketing và truyền thông",
             "Marketing", "📣", "#e91e63",
-            "{\"boardType\":\"KANBAN\"," +
+            "{\"projectType\":\"MARKETING\"," +
+            "\"boardType\":\"KANBAN\"," +
+            "\"enabledModules\":[\"ATTACHMENT\",\"APPROVAL\"]," +
             "\"columns\":[" +
               "{\"name\":\"Ý tưởng\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
               "{\"name\":\"Lên kế hoạch\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
@@ -184,7 +253,9 @@ public class ProjectTemplateService {
         createSystemTemplate("Thiết kế UI/UX",
             "Template cho dự án thiết kế giao diện và trải nghiệm người dùng",
             "Design", "🎨", "#9c27b0",
-            "{\"boardType\":\"KANBAN\"," +
+            "{\"projectType\":\"DESIGN\"," +
+            "\"boardType\":\"KANBAN\"," +
+            "\"enabledModules\":[\"ATTACHMENT\",\"APPROVAL\",\"REVIEW\"]," +
             "\"columns\":[" +
               "{\"name\":\"Research\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
               "{\"name\":\"Wireframe\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
@@ -197,7 +268,9 @@ public class ProjectTemplateService {
         createSystemTemplate("Quản lý sự kiện",
             "Template cho tổ chức và quản lý sự kiện",
             "Event", "🎪", "#ff5722",
-            "{\"boardType\":\"KANBAN\"," +
+            "{\"projectType\":\"EVENT\"," +
+            "\"boardType\":\"KANBAN\"," +
+            "\"enabledModules\":[\"CHECKLIST\",\"MILESTONE\"]," +
             "\"columns\":[" +
               "{\"name\":\"Lên kế hoạch\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
               "{\"name\":\"Chuẩn bị\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +

@@ -26,6 +26,9 @@ public class KanbanBoardResponse {
     private UUID projectId;
     private String projectName;
     private Board.BoardType boardType;
+    private Boolean isSprintBoard;
+    private UUID sprintId;
+    private String sprintName;
     private UUID ownerId;
     private List<KanbanColumnData> columns;
 

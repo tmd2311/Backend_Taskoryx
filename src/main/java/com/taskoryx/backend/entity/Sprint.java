@@ -70,10 +70,7 @@ public class Sprint {
     @JoinColumn(name = "board_id", foreignKey = @ForeignKey(name = "fk_sprints_board"))
     private Board board;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(name = "sprint_tasks",
-        joinColumns = @JoinColumn(name = "sprint_id"),
-        inverseJoinColumns = @JoinColumn(name = "task_id"))
+    @OneToMany(mappedBy = "sprint", fetch = FetchType.LAZY)
     @Builder.Default
     private Set<Task> tasks = new HashSet<>();
 
