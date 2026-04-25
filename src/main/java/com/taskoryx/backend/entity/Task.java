@@ -30,7 +30,8 @@ import java.util.UUID;
         @Index(name = "idx_tasks_reporter", columnList = "reporter_id"),
         @Index(name = "idx_tasks_due_date", columnList = "dueDate"),
         @Index(name = "idx_tasks_priority", columnList = "priority"),
-        @Index(name = "idx_tasks_category", columnList = "category_id")
+        @Index(name = "idx_tasks_category", columnList = "category_id"),
+        @Index(name = "idx_tasks_parent", columnList = "parent_id")
     }
 )
 @Getter
@@ -156,6 +157,30 @@ public class Task {
     @OneToMany(mappedBy = "parentTask", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @Builder.Default
     private Set<Task> subTasks = new HashSet<>();
+
+    /**
+     * Trả về độ sâu (level) của task trong cây phân cấp.
+     * Task không có cha = level 1, cha level 1 = level 2, cha level 2 = level 3.
+     * Giới hạn tối đa là 3 cấp.
+     */
+    @Transient
+    public int getDepth() {
+        int depth = 1;
+        Task current = this.parentTask;
+        while (current != null) {
+            depth++;
+            current = current.getParentTask();
+        }
+        return depth;
+    }
+
+    /**
+     * Kiểm tra task có thể nhận task con hay không (chỉ cấp 1 và 2 mới được).
+     */
+    @Transient
+    public boolean canHaveChildren() {
+        return getDepth() < 3;
+    }
 
     /**
      * Enum for task priority

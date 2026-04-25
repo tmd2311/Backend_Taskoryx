@@ -31,6 +31,7 @@ erDiagram
     TASKS ||--o{ TASK_LABELS : tagged
     TASKS ||--o{ TIME_TRACKING : tracked
     TASKS ||--o{ TASK_DEPENDENCIES : depends
+    TASKS ||--o{ TASKS : "parent of (max 3 levels)"
 
     LABELS ||--o{ TASK_LABELS : applied
 
@@ -104,10 +105,14 @@ erDiagram
         uuid project_id FK
         uuid board_id FK
         uuid column_id FK
+        uuid parent_id FK "nullable, self-ref, max depth 3"
+        uuid sprint_id FK
+        uuid category_id FK
         integer task_number
-        varchar title
+        varchar title "max 500"
         text description
-        varchar priority
+        varchar priority "LOW|MEDIUM|HIGH|URGENT"
+        varchar status "TODO|IN_PROGRESS|IN_REVIEW|RESOLVED|DONE|CANCELLED"
         decimal position
         uuid assignee_id FK
         uuid reporter_id FK
@@ -231,7 +236,8 @@ erDiagram
 
 ### Self-Referencing
 - **Comments → Comments**: Comment có thể reply comment khác (parent_id)
-- **Tasks → Tasks**: Task có thể phụ thuộc vào task khác (task_dependencies)
+- **Tasks → Tasks (dependencies)**: Task có thể phụ thuộc vào task khác (task_dependencies)
+- **Tasks → Tasks (hierarchy)**: Task có thể là con của task khác qua `parent_id`, tối đa 3 cấp
 
 ## 📌 Important Constraints
 
@@ -242,6 +248,12 @@ erDiagram
 4. `(project_id, task_number)` - Task number duy nhất trong project
 5. `(project_id, user_id)` - User chỉ có 1 role trong 1 project
 6. `(task_id, label_id)` - Mỗi label chỉ gắn 1 lần cho task
+
+### Task Hierarchy Constraints
+- `tasks.parent_id` là nullable self-FK → `tasks.id`
+- Index `idx_tasks_parent` trên cột `parent_id`
+- Giới hạn tối đa 3 cấp được enforce ở tầng **service** (không phải DB constraint)
+- Không cho phép vòng lặp — detect bằng DFS trong `TaskService.isDescendant()`
 
 ### Foreign Key Actions
 - **ON DELETE CASCADE**: Xóa parent → xóa children

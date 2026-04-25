@@ -2,6 +2,7 @@ package com.taskoryx.backend.dto.request.task;
 
 import com.taskoryx.backend.entity.Task;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -19,9 +20,8 @@ public class CreateTaskRequest {
 
     private String description;
 
-    private UUID boardId;
-
-    private UUID columnId;
+    @NotNull(message = "Sprint không được để trống")
+    private UUID sprintId;
 
     private Task.TaskPriority priority = Task.TaskPriority.MEDIUM;
 
@@ -35,8 +35,6 @@ public class CreateTaskRequest {
     private List<UUID> labelIds;
 
     private UUID categoryId;
-
-    private UUID sprintId;
 
     private UUID parentTaskId;
 }

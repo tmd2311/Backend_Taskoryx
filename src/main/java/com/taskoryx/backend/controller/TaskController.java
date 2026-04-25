@@ -124,4 +124,14 @@ public class TaskController {
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success(taskService.getTaskByKey(taskKey, principal)));
     }
+
+    @GetMapping("/projects/{projectId}/tasks/valid-parents")
+    @Operation(summary = "Lấy danh sách task có thể chọn làm cha (loại task cấp 3, task hiện tại và cây con của nó)")
+    public ResponseEntity<ApiResponse<List<TaskSummaryResponse>>> getValidParentTasks(
+            @PathVariable UUID projectId,
+            @RequestParam(required = false) UUID excludeTaskId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                taskService.getValidParentTasks(projectId, excludeTaskId, principal)));
+    }
 }

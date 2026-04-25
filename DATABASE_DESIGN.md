@@ -165,20 +165,24 @@ Lưu trữ thông tin chi tiết các task.
 |--------|------|-------------|-------------|
 | id | UUID | PK | ID task |
 | project_id | UUID | FK -> Projects(id) | ID dự án |
-| board_id | UUID | FK -> Boards(id) | ID bảng |
-| column_id | UUID | FK -> Columns(id) | ID cột |
-| task_number | INTEGER | NOT NULL | Số thứ tự task |
-| title | VARCHAR(255) | NOT NULL | Tiêu đề |
+| board_id | UUID | FK -> Boards(id) | ID bảng (nullable) |
+| column_id | UUID | FK -> Columns(id) | ID cột (nullable, null = Backlog) |
+| parent_id | UUID | FK -> Tasks(id), NULL | Task cha (null = task gốc cấp 1; tối đa 3 cấp) |
+| sprint_id | UUID | FK -> Sprints(id), NULL | Sprint hiện tại |
+| category_id | UUID | FK -> IssueCategories(id), NULL | Danh mục task |
+| task_number | INTEGER | NOT NULL | Số thứ tự trong project, tự tăng |
+| title | VARCHAR(500) | NOT NULL | Tiêu đề (max 500 ký tự) |
 | description | TEXT | NULL | Mô tả chi tiết |
 | priority | VARCHAR(20) | DEFAULT 'MEDIUM' | LOW, MEDIUM, HIGH, URGENT |
-| position | DECIMAL(10,2) | NOT NULL | Vị trí trong cột |
-| assignee_id | UUID | FK -> Users(id) | Người được giao |
-| reporter_id | UUID | FK -> Users(id) | Người tạo task |
+| status | VARCHAR(20) | DEFAULT 'TODO' | TODO, IN_PROGRESS, IN_REVIEW, RESOLVED, DONE, CANCELLED |
+| position | DECIMAL(10,2) | NOT NULL | Vị trí trong cột (drag & drop) |
+| assignee_id | UUID | FK -> Users(id), NULL | Người được giao |
+| reporter_id | UUID | FK -> Users(id), NOT NULL | Người tạo task |
 | start_date | DATE | NULL | Ngày bắt đầu |
 | due_date | DATE | NULL | Deadline |
-| estimated_hours | DECIMAL(5,2) | NULL | Thời gian ước tính |
-| actual_hours | DECIMAL(5,2) | NULL | Thời gian thực tế |
-| completed_at | TIMESTAMP | NULL | Ngày hoàn thành |
+| estimated_hours | DECIMAL(5,2) | NULL | Giờ ước tính |
+| actual_hours | DECIMAL(5,2) | NULL | Giờ thực tế (tổng từ time_tracking) |
+| completed_at | TIMESTAMP | NULL | null = chưa xong; tự set khi status = DONE/RESOLVED |
 | created_at | TIMESTAMP | DEFAULT NOW() | Ngày tạo |
 | updated_at | TIMESTAMP | DEFAULT NOW() | Ngày cập nhật |
 
@@ -191,6 +195,8 @@ Lưu trữ thông tin chi tiết các task.
 - `idx_tasks_reporter` ON reporter_id
 - `idx_tasks_due_date` ON due_date
 - `idx_tasks_priority` ON priority
+- `idx_tasks_category` ON category_id
+- `idx_tasks_parent` ON parent_id
 - `idx_tasks_position` ON (column_id, position)
 
 ---
@@ -393,6 +399,12 @@ Quản lý mối quan hệ phụ thuộc giữa các task.
 2. Task không thể có due_date < start_date
 3. Task position sử dụng decimal để hỗ trợ reorder (1.0, 1.5, 2.0)
 4. Khi move task sang cột "Completed", tự động set completed_at
+5. **Phân cấp cha-con tối đa 3 cấp** qua `parent_id` (self-referencing FK):
+   - Cấp 1: `parent_id = NULL`
+   - Cấp 2: cha là cấp 1
+   - Cấp 3: cha là cấp 2 — không thể có con
+6. Khi đổi `parent_id`, validate toàn bộ nhánh con không vượt cấp 3
+7. Không cho phép vòng lặp cha-con (detect bằng DFS qua parentTask chain)
 
 ### Permissions
 - **OWNER**: Full access, có thể xóa project

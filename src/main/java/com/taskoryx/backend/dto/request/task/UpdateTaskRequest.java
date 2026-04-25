@@ -12,7 +12,7 @@ import java.util.UUID;
 @Data
 public class UpdateTaskRequest {
 
-    @Size(max = 500, message = "Tiêu đề task không được quá 500 ký tự")
+    @Size(min = 1, max = 500, message = "Tiêu đề task phải từ 1 đến 500 ký tự")
     private String title;
 
     private String description;

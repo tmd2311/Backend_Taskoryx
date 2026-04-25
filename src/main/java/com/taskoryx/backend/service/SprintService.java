@@ -304,33 +304,18 @@ public class SprintService {
     }
 
     private void attachTaskToSprintBoard(Sprint sprint, Task task) {
-        if (sprint.getBoard() == null) {
-            return;
+        if (sprint.getBoard() != null && task.getBoard() == null) {
+            task.setBoard(sprint.getBoard());
         }
-        task.setBoard(sprint.getBoard());
-        task.setColumn(null);
     }
 
     private void detachTaskFromSprintBoard(Sprint sprint, Task task) {
-        if (sprint.getBoard() == null) {
-            return;
-        }
-        if (task.getBoard() != null && task.getBoard().getId().equals(sprint.getBoard().getId())) {
-            task.setBoard(null);
-            task.setColumn(null);
-        }
+        // giữ nguyên board/column, chỉ bỏ liên kết sprint
     }
 
     private void clearTasksFromSprintBoard(Sprint sprint, Board board) {
-        if (board == null) {
-            return;
-        }
         taskRepository.findBySprintIdOrderByCreatedAtAsc(sprint.getId()).forEach(task -> {
             task.setSprint(null);
-            if (task.getBoard() != null && task.getBoard().getId().equals(board.getId())) {
-                task.setBoard(null);
-                task.setColumn(null);
-            }
             taskRepository.save(task);
         });
     }

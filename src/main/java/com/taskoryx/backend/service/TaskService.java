@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -56,35 +57,13 @@ public class TaskService {
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
         validateCreateRequestAgainstProjectConfig(project, request);
 
-        Board board = null;
-        BoardColumn column = null;
-
-        if (request.getBoardId() != null) {
-            board = findBoardInProject(projectId, request.getBoardId());
+        Sprint sprint = findSprintInProject(projectId, request.getSprintId());
+        if (sprint.getBoard() == null) {
+            throw new BadRequestException("Sprint chưa có kanban board");
         }
-
-        if (request.getColumnId() != null) {
-            column = findColumnInProject(projectId, request.getColumnId());
-        }
-
-        // Nếu có columnId thì phải có boardId
-        if (column != null && board == null) {
-            throw new BadRequestException("Phải cung cấp boardId khi chỉ định columnId");
-        }
-        if (board != null && column != null && !column.getBoard().getId().equals(board.getId())) {
-            throw new BadRequestException("Cột được chọn không thuộc board đã chỉ định");
-        }
-        Sprint sprint = null;
-        if (request.getSprintId() != null) {
-            sprint = findSprintInProject(projectId, request.getSprintId());
-            if (sprint.getBoard() == null) {
-                throw new BadRequestException("Sprint chưa có kanban board");
-            }
-            if (board != null && sprint.getBoard() != null && !board.getId().equals(sprint.getBoard().getId())) {
-                throw new BadRequestException("Task thuộc sprint phải dùng đúng kanban của sprint đó");
-            }
-            board = sprint.getBoard();
-        }
+        Board board = sprint.getBoard();
+        BoardColumn column = boardColumnRepository.findFirstByBoardIdOrderByPositionAsc(board.getId())
+                .orElseThrow(() -> new BadRequestException("Board của sprint chưa có cột nào"));
 
         User reporter = userRepository.findById(principal.getId()).orElseThrow();
 
@@ -97,11 +76,8 @@ public class TaskService {
         int nextTaskNumber = taskRepository.findMaxTaskNumberByProjectId(projectId)
                 .map(n -> n + 1).orElse(1);
 
-        // Tính position
-        BigDecimal position = column != null
-                ? taskRepository.findMaxPositionByColumnId(column.getId())
-                        .map(p -> p.add(BigDecimal.valueOf(1000))).orElse(BigDecimal.valueOf(1000))
-                : BigDecimal.ZERO;
+        BigDecimal position = taskRepository.findMaxPositionByColumnId(column.getId())
+                .map(p -> p.add(BigDecimal.valueOf(1000))).orElse(BigDecimal.valueOf(1000));
 
         IssueCategory category = null;
         if (request.getCategoryId() != null) {
@@ -114,6 +90,9 @@ public class TaskService {
                     .orElseThrow(() -> new ResourceNotFoundException("Task", "id", request.getParentTaskId()));
             if (!parentTask.getProject().getId().equals(projectId)) {
                 throw new BadRequestException("Task cha phải thuộc cùng project");
+            }
+            if (!parentTask.canHaveChildren()) {
+                throw new BadRequestException("Task cha đã ở cấp 3, không thể thêm task con (giới hạn tối đa 3 cấp)");
             }
         }
 
@@ -256,9 +235,19 @@ public class TaskService {
             if (!parent.getProject().getId().equals(task.getProject().getId())) {
                 throw new BadRequestException("Task cha phải thuộc cùng project");
             }
-            // Tránh circular reference: parent không được là subtask của task hiện tại
-            if (parent.getParentTask() != null && parent.getParentTask().getId().equals(taskId)) {
+            if (isDescendant(parent, taskId)) {
                 throw new BadRequestException("Không thể tạo quan hệ cha-con vòng tròn");
+            }
+            if (!parent.canHaveChildren()) {
+                throw new BadRequestException("Task cha đã ở cấp 3, không thể thêm task con (giới hạn tối đa 3 cấp)");
+            }
+            // Kiểm tra nếu gán parent mới, toàn bộ nhánh con vẫn không vượt quá cấp 3
+            int parentDepth = parent.getDepth();
+            int maxChildDepth = getMaxSubTreeDepth(task);
+            if (parentDepth + maxChildDepth > 3) {
+                throw new BadRequestException(
+                        "Không thể gán task cha này vì sẽ khiến cây con vượt quá 3 cấp (cấp cha: "
+                        + parentDepth + ", chiều sâu cây con: " + maxChildDepth + ")");
             }
             task.setParentTask(parent);
         }
@@ -282,28 +271,16 @@ public class TaskService {
                 ProjectPermission.TASK_UPDATE);
         Sprint owningSprint = task.getSprint();
 
-        // targetColumnId = null → chuyển về Backlog
-        if (request.getTargetColumnId() == null) {
-            task.setColumn(null);
-            task.setBoard(owningSprint != null ? owningSprint.getBoard() : null);
-            task.setPosition(request.getNewPosition());
-            task.setCompletedAt(null);
-            return TaskResponse.from(taskRepository.save(task));
-        }
-
         BoardColumn targetColumn = boardColumnRepository.findById(request.getTargetColumnId())
                 .orElseThrow(() -> new ResourceNotFoundException("Column", "id", request.getTargetColumnId()));
         if (!targetColumn.getBoard().getProject().getId().equals(task.getProject().getId())) {
             throw new BadRequestException("Không thể chuyển task sang cột của dự án khác");
         }
         Sprint targetSprint = sprintRepository.findByBoardId(targetColumn.getBoard().getId()).orElse(null);
-        if (targetSprint != null) {
-            if (owningSprint == null || !targetSprint.getId().equals(owningSprint.getId())) {
-                throw new BadRequestException("Task phải được thêm vào sprint trước khi kéo vào kanban của sprint đó");
-            }
-        } else if (owningSprint != null && owningSprint.getBoard() != null
-                && !owningSprint.getBoard().getId().equals(targetColumn.getBoard().getId())) {
-            throw new BadRequestException("Task đang thuộc sprint chỉ có thể di chuyển trong kanban của sprint đó");
+        if (targetSprint != null && (owningSprint == null || !targetSprint.getId().equals(owningSprint.getId()))) {
+            task.setSprint(targetSprint);
+        } else if (targetSprint == null && owningSprint != null) {
+            task.setSprint(null);
         }
 
         // Kiểm tra WIP limit
@@ -459,15 +436,11 @@ public class TaskService {
     }
 
     private void validateCreateRequestAgainstProjectConfig(Project project, CreateTaskRequest request) {
+        projectCapabilityService.requireModule(project, ProjectCapabilityService.MODULE_SPRINT);
         requireConfiguredTaskField(project, "dueDate", request.getDueDate(), "dueDate");
         requireConfiguredTaskField(project, "estimatedHours", request.getEstimatedHours(), "estimatedHours");
         requireConfiguredTaskField(project, "assignee", request.getAssigneeId(), "assignee");
         requireConfiguredTaskField(project, "labels", request.getLabelIds(), "labels");
-        requireConfiguredTaskField(project, "sprint", request.getSprintId(), "sprint");
-
-        if (request.getSprintId() != null) {
-            projectCapabilityService.requireModule(project, ProjectCapabilityService.MODULE_SPRINT);
-        }
 
         validateRequiredTaskFields(project,
                 request.getPriority() != null ? request.getPriority() : Task.TaskPriority.MEDIUM,
@@ -475,7 +448,7 @@ public class TaskService {
                 request.getEstimatedHours(),
                 request.getAssigneeId(),
                 request.getLabelIds(),
-                request.getSprintId());
+                null);
     }
 
     private void validateUpdateRequestAgainstProjectConfig(Task task, UpdateTaskRequest request) {
@@ -642,9 +615,6 @@ public class TaskService {
     }
 
     private void attachTaskToSprint(Task task, Sprint sprint) {
-        if (sprint.getBoard() == null) {
-            throw new BadRequestException("Sprint chưa có kanban board");
-        }
         if (task.getSprint() != null
                 && !task.getSprint().getId().equals(sprint.getId())
                 && (task.getSprint().getStatus() == Sprint.SprintStatus.PLANNED
@@ -652,19 +622,13 @@ public class TaskService {
             throw new BadRequestException("Task đang thuộc một sprint khác đang PLANNED hoặc ACTIVE");
         }
         task.setSprint(sprint);
-        task.setBoard(sprint.getBoard());
-        task.setColumn(null);
-        task.setPosition(BigDecimal.ZERO);
+        if (task.getBoard() == null && sprint.getBoard() != null) {
+            task.setBoard(sprint.getBoard());
+        }
     }
 
     private void detachTaskFromSprint(Task task) {
-        Board sprintBoard = task.getSprint() != null ? task.getSprint().getBoard() : null;
         task.setSprint(null);
-        if (sprintBoard != null && task.getBoard() != null && task.getBoard().getId().equals(sprintBoard.getId())) {
-            task.setBoard(null);
-            task.setColumn(null);
-            task.setPosition(BigDecimal.ZERO);
-        }
     }
 
     private void validateLabelIdsInProject(UUID projectId, List<UUID> labelIds) {
@@ -684,5 +648,80 @@ public class TaskService {
             throw new BadRequestException("Người dùng được chọn cho " + fieldName + " không thuộc dự án hiện tại");
         }
         return user;
+    }
+
+    /**
+     * Lấy danh sách task hợp lệ để chọn làm cha.
+     * Loại bỏ: task cấp 3 (không thể có con), chính task hiện tại, và toàn bộ cây con của nó.
+     *
+     * @param projectId project scope
+     * @param excludeTaskId nếu khác null, loại task này và cây con của nó (dùng khi sửa task)
+     */
+    @Transactional(readOnly = true)
+    public List<TaskSummaryResponse> getValidParentTasks(UUID projectId, UUID excludeTaskId,
+                                                          UserPrincipal principal) {
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
+        List<Task> candidates = taskRepository.findValidParentCandidates(projectId);
+
+        if (excludeTaskId == null) {
+            return candidates.stream()
+                    .map(TaskSummaryResponse::from)
+                    .collect(Collectors.toList());
+        }
+
+        // Lấy toàn bộ ID của task cần loại trừ + cây con
+        Set<UUID> excludedIds = collectSubTreeIds(excludeTaskId);
+
+        return candidates.stream()
+                .filter(t -> !excludedIds.contains(t.getId()))
+                .map(TaskSummaryResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Kiểm tra xem {@code candidate} có phải là hậu duệ (con, cháu...) của task có id {@code ancestorId} không.
+     */
+    private boolean isDescendant(Task candidate, UUID ancestorId) {
+        Task current = candidate.getParentTask();
+        while (current != null) {
+            if (current.getId().equals(ancestorId)) {
+                return true;
+            }
+            current = current.getParentTask();
+        }
+        return false;
+    }
+
+    /**
+     * Độ sâu tối đa của cây con (tính từ task làm gốc, không kể cha của nó).
+     * Task lá → 1; task có con → 1 + max(con).
+     */
+    private int getMaxSubTreeDepth(Task task) {
+        if (task.getSubTasks() == null || task.getSubTasks().isEmpty()) {
+            return 1;
+        }
+        int max = 0;
+        for (Task child : task.getSubTasks()) {
+            int childDepth = getMaxSubTreeDepth(child);
+            if (childDepth > max) max = childDepth;
+        }
+        return 1 + max;
+    }
+
+    /**
+     * Thu thập tất cả UUID trong cây con (bao gồm chính task gốc).
+     */
+    private Set<UUID> collectSubTreeIds(UUID rootId) {
+        Set<UUID> ids = new HashSet<>();
+        collectSubTreeIdsRecursive(rootId, ids);
+        return ids;
+    }
+
+    private void collectSubTreeIdsRecursive(UUID taskId, Set<UUID> ids) {
+        ids.add(taskId);
+        List<Task> children = taskRepository.findByParentTaskId(taskId);
+        for (Task child : children) {
+            collectSubTreeIdsRecursive(child.getId(), ids);
+        }
     }
 }

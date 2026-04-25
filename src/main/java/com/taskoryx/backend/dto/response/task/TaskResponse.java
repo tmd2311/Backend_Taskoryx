@@ -83,7 +83,8 @@ public class TaskResponse {
     // Watchers
     private long watcherCount;
 
-    // Parent task info
+    // Hierarchy info
+    private int depth;
     private UUID parentTaskId;
     private String parentTaskKey;
     private String parentTaskTitle;
@@ -147,6 +148,7 @@ public class TaskResponse {
                 .categoryId(task.getCategory() != null ? task.getCategory().getId() : null)
                 .categoryName(task.getCategory() != null ? task.getCategory().getName() : null)
                 .watcherCount(task.getWatchers().size())
+                .depth(task.getDepth())
                 .parentTaskId(task.getParentTask() != null ? task.getParentTask().getId() : null)
                 .parentTaskKey(task.getParentTask() != null ? task.getParentTask().getTaskKey() : null)
                 .parentTaskTitle(task.getParentTask() != null ? task.getParentTask().getTitle() : null)
