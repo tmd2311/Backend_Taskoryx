@@ -19,4 +19,5 @@ public class TemplateConfigDto {
     private List<String> taskFields; // e.g. ["priority","dueDate","estimatedHours","assignee"]
     private List<String> customTaskFields;
     private EvaluationConfigDto evaluationConfig;
+    private List<TemplateSprintConfigDto> sprints; // chỉ dùng cho template SCRUM
 }
