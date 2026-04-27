@@ -1,6 +1,7 @@
 package com.taskoryx.backend.repository;
 
 import com.taskoryx.backend.entity.BoardColumn;
+import com.taskoryx.backend.entity.Task;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +17,8 @@ public interface BoardColumnRepository extends JpaRepository<BoardColumn, UUID> 
     List<BoardColumn> findByBoardIdOrderByPositionAsc(UUID boardId);
 
     Optional<BoardColumn> findFirstByBoardIdOrderByPositionAsc(UUID boardId);
+
+    Optional<BoardColumn> findByBoardIdAndMappedStatus(UUID boardId, Task.TaskStatus mappedStatus);
 
     @Query("SELECT MAX(c.position) FROM BoardColumn c WHERE c.board.id = :boardId")
     Integer findMaxPositionByBoardId(@Param("boardId") UUID boardId);

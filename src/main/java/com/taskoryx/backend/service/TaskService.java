@@ -62,8 +62,10 @@ public class TaskService {
             throw new BadRequestException("Sprint chưa có kanban board");
         }
         Board board = sprint.getBoard();
-        BoardColumn column = boardColumnRepository.findFirstByBoardIdOrderByPositionAsc(board.getId())
-                .orElseThrow(() -> new BadRequestException("Board của sprint chưa có cột nào"));
+        Task.TaskStatus initialStatus = request.getStatus() != null ? request.getStatus() : Task.TaskStatus.TODO;
+        BoardColumn column = boardColumnRepository.findByBoardIdAndMappedStatus(board.getId(), initialStatus)
+                .orElseGet(() -> boardColumnRepository.findFirstByBoardIdOrderByPositionAsc(board.getId())
+                        .orElseThrow(() -> new BadRequestException("Board của sprint chưa có cột nào")));
 
         User reporter = userRepository.findById(principal.getId()).orElseThrow();
 
@@ -104,6 +106,7 @@ public class TaskService {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .priority(request.getPriority() != null ? request.getPriority() : Task.TaskPriority.MEDIUM)
+                .status(initialStatus)
                 .position(position)
                 .assignee(assignee)
                 .reporter(reporter)
@@ -379,6 +382,8 @@ public class TaskService {
             query.distinct(true);
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("project").get("id"), projectId));
+            // Chỉ lấy task gốc (cấp 1); task con được nhúng vào subTasks của task cha
+            predicates.add(cb.isNull(root.get("parentTask")));
 
             if (filter.getKeyword() != null && !filter.getKeyword().isBlank()) {
                 String keyword = "%" + filter.getKeyword().trim().toLowerCase(Locale.ROOT) + "%";

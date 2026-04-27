@@ -140,11 +140,17 @@ public class DemoDataInitializer implements ApplicationRunner {
                 Sprint.SprintStatus.ACTIVE,
                 LocalDate.of(2026, 3, 17), LocalDate.of(2026, 3, 30));
 
+        Sprint sp5 = saveSprint(project, "Sprint 5 — Tiện ích",
+                "Rating sản phẩm, yêu thích, cải thiện UX, xuất báo cáo, khuyến mãi.",
+                Sprint.SprintStatus.PLANNED,
+                LocalDate.of(2026, 4, 28), LocalDate.of(2026, 5, 11));
+
         // Load sprint columns từ DB để dùng cho assignTasksToSprint
         Map<Task.TaskStatus, BoardColumn> sp1Cols = loadSprintColumns(sp1);
         Map<Task.TaskStatus, BoardColumn> sp2Cols = loadSprintColumns(sp2);
         Map<Task.TaskStatus, BoardColumn> sp3Cols = loadSprintColumns(sp3);
         Map<Task.TaskStatus, BoardColumn> sp4Cols = loadSprintColumns(sp4);
+        Map<Task.TaskStatus, BoardColumn> sp5Cols = loadSprintColumns(sp5);
 
         // ── 9. Tasks Sprint 1 (COMPLETED) ──────────────────────────────────
         Task t1 = saveTask(project, 1, "Thiết kế database schema",
@@ -355,13 +361,13 @@ public class DemoDataInitializer implements ApplicationRunner {
         addComment(t19, tuan, "Reproduce: Thêm sản phẩm có 20% discount vào giỏ → giá ở CartPage hiển thị đúng → sang CheckoutPage giá lại thành giá gốc.");
         addComment(t19, lan,  "Root cause: CartPage tính discount ở frontend, CheckoutPage gọi lại API lấy price gốc. Đang fix để dùng discountedPrice từ API.");
 
-        // ── 13. Tasks Backlog (sprint=null, column=null) ────────────────────
+        // ── 13. Tasks Sprint 5 (PLANNED) ───────────────────────────────────
         Task t21 = saveTask(project, 21, "Hệ thống đánh giá sản phẩm",
                 "Cho phép người dùng đánh giá sao và viết nhận xét sản phẩm đã mua. Hiển thị trung bình rating.",
                 Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
                 duc, admin, null, null,
                 BigDecimal.valueOf(20), null,
-                null, catFeature, null, null, null, BigDecimal.ZERO);
+                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("1000"));
         addLabels(t21, lBe, lApi);
 
         Task t22 = saveTask(project, 22, "Tính năng yêu thích sản phẩm",
@@ -369,7 +375,7 @@ public class DemoDataInitializer implements ApplicationRunner {
                 Task.TaskPriority.LOW, Task.TaskStatus.TODO,
                 lan, admin, null, null,
                 BigDecimal.valueOf(8), null,
-                null, catFeature, null, null, null, BigDecimal.ZERO);
+                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("2000"));
         addLabels(t22, lFe);
 
         Task t23 = saveTask(project, 23, "Cải thiện UX trang checkout",
@@ -377,7 +383,7 @@ public class DemoDataInitializer implements ApplicationRunner {
                 Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
                 lan, admin, null, null,
                 BigDecimal.valueOf(16), null,
-                null, catImprove, null, null, null, BigDecimal.ZERO);
+                null, catImprove, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("3000"));
         addLabels(t23, lFe, lUx);
 
         Task t24 = saveTask(project, 24, "API xuất báo cáo Excel",
@@ -385,7 +391,7 @@ public class DemoDataInitializer implements ApplicationRunner {
                 Task.TaskPriority.LOW, Task.TaskStatus.TODO,
                 duc, admin, null, null,
                 BigDecimal.valueOf(12), null,
-                null, catFeature, null, null, null, BigDecimal.ZERO);
+                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("4000"));
         addLabels(t24, lBe, lApi);
 
         Task t25 = saveTask(project, 25, "Module khuyến mãi và voucher",
@@ -393,11 +399,11 @@ public class DemoDataInitializer implements ApplicationRunner {
                 Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
                 duc, admin, null, null,
                 BigDecimal.valueOf(28), null,
-                null, catFeature, null, null, null, BigDecimal.ZERO);
+                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("5000"));
         addLabels(t25, lBe, lApi);
         addComment(t25, nam, "Cần confirm với stakeholder về các loại voucher trước khi implement. @nguyen.ducnv bạn có thể họp với PM tuần tới không?");
 
-        log.info("Demo data created successfully: project TMDT with 25 tasks.");
+        log.info("Demo data created successfully: project TMDT with 25 tasks across 5 sprints.");
     }
 
     // ── HELPER METHODS ──────────────────────────────────────────────────────

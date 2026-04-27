@@ -37,4 +37,6 @@ public class CreateTaskRequest {
     private UUID categoryId;
 
     private UUID parentTaskId;
+
+    private Task.TaskStatus status;
 }

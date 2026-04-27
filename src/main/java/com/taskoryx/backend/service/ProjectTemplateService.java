@@ -227,7 +227,6 @@ public class ProjectTemplateService {
             "\"boardType\":\"SCRUM\"," +
             "\"enabledModules\":[\"SPRINT\",\"TIME_TRACKING\"]," +
             "\"columns\":[" +
-              "{\"name\":\"Backlog\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
               "{\"name\":\"Cần làm\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
               "{\"name\":\"Đang làm\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
               "{\"name\":\"Review\",\"color\":\"#8b5cf6\",\"isCompleted\":false}," +
