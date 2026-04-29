@@ -1,6 +1,7 @@
 package com.taskoryx.backend.controller;
 
 import com.taskoryx.backend.dto.request.template.CreateProjectFromTemplateRequest;
+import com.taskoryx.backend.dto.request.template.CreateTemplateRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
 import com.taskoryx.backend.dto.response.template.ProjectTemplateResponse;
@@ -12,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,6 +41,13 @@ public class ProjectTemplateController {
         return ResponseEntity.ok(ApiResponse.success(templateService.getPublicTemplates()));
     }
 
+    @GetMapping("/{templateId}")
+    @Operation(summary = "Xem chi tiết một template")
+    public ResponseEntity<ApiResponse<ProjectTemplateResponse>> getTemplateById(
+            @PathVariable UUID templateId) {
+        return ResponseEntity.ok(ApiResponse.success(templateService.getTemplateById(templateId)));
+    }
+
     @PostMapping("/{templateId}/use")
     @Operation(summary = "Tạo dự án mới từ template")
     public ResponseEntity<ApiResponse<ProjectResponse>> createFromTemplate(
@@ -48,5 +57,36 @@ public class ProjectTemplateController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Tạo dự án từ template thành công",
                         templateService.createProjectFromTemplate(templateId, request, principal)));
+    }
+
+    // ── Admin-only endpoints ─────────────────────────────────────────────────
+
+    @PostMapping
+    @PreAuthorize("hasAuthority('TEMPLATE_MANAGE')")
+    @Operation(summary = "[TEMPLATE_MANAGE] Tạo template mới")
+    public ResponseEntity<ApiResponse<ProjectTemplateResponse>> createTemplate(
+            @Valid @RequestBody CreateTemplateRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Tạo template thành công",
+                        templateService.createTemplate(request, principal)));
+    }
+
+    @PutMapping("/{templateId}")
+    @PreAuthorize("hasAuthority('TEMPLATE_MANAGE')")
+    @Operation(summary = "[TEMPLATE_MANAGE] Cập nhật template")
+    public ResponseEntity<ApiResponse<ProjectTemplateResponse>> updateTemplate(
+            @PathVariable UUID templateId,
+            @Valid @RequestBody CreateTemplateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật template thành công",
+                templateService.updateTemplate(templateId, request)));
+    }
+
+    @DeleteMapping("/{templateId}")
+    @PreAuthorize("hasAuthority('TEMPLATE_MANAGE')")
+    @Operation(summary = "[TEMPLATE_MANAGE] Xóa template")
+    public ResponseEntity<ApiResponse<Void>> deleteTemplate(@PathVariable UUID templateId) {
+        templateService.deleteTemplate(templateId);
+        return ResponseEntity.ok(ApiResponse.success("Xóa template thành công", null));
     }
 }

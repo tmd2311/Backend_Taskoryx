@@ -1,6 +1,5 @@
 package com.taskoryx.backend.controller;
 
-import com.taskoryx.backend.dto.request.role.ChangeMemberRoleRequest;
 import com.taskoryx.backend.dto.request.role.CreateProjectRoleRequest;
 import com.taskoryx.backend.dto.request.role.UpdateProjectRoleRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
@@ -53,17 +52,6 @@ public class ProjectRoleController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 "Tạo vai trò thành công",
                 projectRoleService.createRole(id, request, principal)));
-    }
-
-    @PatchMapping("/projects/{id}/members/{userId}/role")
-    @Operation(summary = "Thay đổi role của thành viên (Owner/Admin)")
-    public ResponseEntity<ApiResponse<Void>> changeMemberRole(
-            @PathVariable UUID id,
-            @PathVariable UUID userId,
-            @Valid @RequestBody ChangeMemberRoleRequest request,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        projectRoleService.changeMemberRole(id, userId, request, principal);
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật vai trò thành công"));
     }
 
     @PutMapping("/project-roles/{id}")

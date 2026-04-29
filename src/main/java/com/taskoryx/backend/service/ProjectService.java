@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskoryx.backend.dto.request.project.AddMemberRequest;
 import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
-import com.taskoryx.backend.dto.request.project.UpdateMemberRoleRequest;
 import com.taskoryx.backend.dto.request.project.UpdateProjectRequest;
 import com.taskoryx.backend.dto.response.comment.MentionedUserInfo;
 import com.taskoryx.backend.dto.response.project.ProjectMemberResponse;
@@ -187,39 +186,19 @@ public class ProjectService {
             throw new BadRequestException("Người dùng này đã là thành viên của dự án");
         }
 
-        // Nếu user có system role → tự động gán project role tương ứng (ưu tiên role không phải ADMIN)
-        String systemRole = newMember.getUserRoles().stream()
+        // Role trong dự án = system role của user (user chỉ có 1 system role)
+        String projectRole = newMember.getUserRoles().stream()
                 .map(ur -> ur.getRole().getName())
-                .filter(name -> !"ADMIN".equals(name))
                 .findFirst()
-                .orElse(newMember.getUserRoles().stream()
-                        .map(ur -> ur.getRole().getName())
-                        .findFirst()
-                        .orElse(null));
-        String projectRole = systemRole != null ? systemRole : request.getRole();
-        if (projectRole == null || projectRole.isBlank()) {
-            throw new BadRequestException("Vui lòng chỉ định vai trò cho thành viên");
-        }
+                .orElseThrow(() -> new BadRequestException(
+                        "Người dùng '" + request.getEmail() + "' chưa được gán role hệ thống. " +
+                        "Vui lòng liên hệ admin để cấp quyền trước khi thêm vào dự án."));
 
         ProjectMember member = ProjectMember.builder()
                 .project(project)
                 .user(newMember)
                 .role(projectRole)
                 .build();
-        return ProjectMemberResponse.from(projectMemberRepository.save(member));
-    }
-
-    @Transactional
-    public ProjectMemberResponse updateMemberRole(UUID projectId, UUID userId,
-                                                   UpdateMemberRoleRequest request,
-                                                   UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
-        ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong dự án"));
-        if ("OWNER".equals(member.getRole())) {
-            throw new ForbiddenException("Không thể thay đổi vai trò của chủ sở hữu");
-        }
-        member.setRole(request.getRole());
         return ProjectMemberResponse.from(projectMemberRepository.save(member));
     }
 

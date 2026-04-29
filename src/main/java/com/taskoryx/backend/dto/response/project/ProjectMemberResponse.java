@@ -21,10 +21,21 @@ public class ProjectMemberResponse {
     private String email;
     private String fullName;
     private String avatarUrl;
-    private String role;
+    private String role;           // system role name (SUPER_ADMIN, PROJECT_MANAGER, ...)
+    private String roleDescription;
     private LocalDateTime joinedAt;
 
     public static ProjectMemberResponse from(ProjectMember member) {
+        // Lấy system role từ UserRole (user chỉ có 1 role)
+        String roleName = member.getUser().getUserRoles().stream()
+                .map(ur -> ur.getRole().getName())
+                .findFirst()
+                .orElse(member.getRole());
+        String roleDesc = member.getUser().getUserRoles().stream()
+                .map(ur -> ur.getRole().getDescription())
+                .findFirst()
+                .orElse(null);
+
         return ProjectMemberResponse.builder()
                 .id(member.getId())
                 .userId(member.getUser().getId())
@@ -32,7 +43,8 @@ public class ProjectMemberResponse {
                 .email(member.getUser().getEmail())
                 .fullName(member.getUser().getFullName())
                 .avatarUrl(member.getUser().getAvatarUrl())
-                .role(member.getRole())
+                .role(roleName)
+                .roleDescription(roleDesc)
                 .joinedAt(member.getJoinedAt())
                 .build();
     }

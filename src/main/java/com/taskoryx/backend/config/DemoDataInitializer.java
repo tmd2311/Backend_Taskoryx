@@ -18,14 +18,15 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Tạo dữ liệu demo thực tế khi app khởi động lần đầu.
- * Chỉ chạy nếu chưa có project nào trong DB.
+ * Tạo dữ liệu demo khi app khởi động lần đầu (chỉ chạy khi chưa có project nào).
+ * Chạy sau DataInitializer (@Order 1) nên đảm bảo roles/permissions đã sẵn sàng.
  *
  * Kịch bản: Dự án "Nền tảng thương mại điện tử" (key: TMDT)
- * - 5 thành viên (admin là OWNER)
- * - 7 labels, 4 issue categories
- * - 4 sprints (3 COMPLETED + 1 ACTIVE)
- * - 25 tasks với comments, time tracking
+ *   admin  → SUPER_ADMIN (system) + OWNER (project)
+ *   nam    → PROJECT_MANAGER (system) + ADMIN (project)  — Trưởng dự án
+ *   duc    → TEAM_LEAD (system) + MEMBER (project)       — Tech lead backend
+ *   lan    → MEMBER (system) + MEMBER (project)          — Frontend dev
+ *   tuan   → MEMBER (system) + MEMBER (project)          — QA/Tester
  */
 @Component
 @RequiredArgsConstructor
@@ -46,6 +47,8 @@ public class DemoDataInitializer implements ApplicationRunner {
     private final TimeTrackingRepository timeTrackingRepository;
     private final PasswordEncoder passwordEncoder;
     private final TaskLabelRepository taskLabelRepository;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
 
     @Override
     @Transactional
@@ -57,6 +60,14 @@ public class DemoDataInitializer implements ApplicationRunner {
 
         log.info("Creating demo project data...");
 
+        // ── 0. Load system roles (đã được DataInitializer tạo trước) ──────────
+        Role roleSuperAdmin     = findRole("SUPER_ADMIN");
+        Role roleAdmin          = findRole("ADMIN");
+        Role roleProjectManager = findRole("PROJECT_MANAGER");
+        Role roleTeamLead       = findRole("TEAM_LEAD");
+        Role roleMember         = findRole("MEMBER");
+
+        // ── 1. Lấy / tạo users ───────────────────────────────────────────────
         User admin = userRepository.findByEmail("admin@taskoryx.com")
                 .orElseGet(() -> userRepository.save(User.builder()
                         .username("admin")
@@ -65,18 +76,30 @@ public class DemoDataInitializer implements ApplicationRunner {
                         .fullName("System Administrator")
                         .isActive(true)
                         .emailVerified(true)
+                        .mustChangePassword(false)
                         .build()));
 
-        // ── 1. Tạo thành viên ──────────────────────────────────────────────
-        User nam   = createUser("le_namhp",     "Lê Hoàng Nam",     "nam@taskoryx.com");
-        User duc   = createUser("nguyen_ducnv",  "Nguyễn Văn Đức",   "duc@taskoryx.com");
-        User lan   = createUser("tran_lant",     "Trần Thị Lan",     "lan@taskoryx.com");
-        User tuan  = createUser("pham_tuanpm",   "Phạm Minh Tuấn",   "tuan@taskoryx.com");
+        // nam — quản lý dự án, có quyền thêm thành viên
+        User nam  = createUser("le_namhp",    "Lê Hoàng Nam",   "nam@taskoryx.com");
+        // duc — tech lead backend
+        User duc  = createUser("nguyen_ducnv", "Nguyễn Văn Đức", "duc@taskoryx.com");
+        // lan — frontend developer
+        User lan  = createUser("tran_lant",    "Trần Thị Lan",   "lan@taskoryx.com");
+        // tuan — QA / tester
+        User tuan = createUser("pham_tuanpm",  "Phạm Minh Tuấn", "tuan@taskoryx.com");
 
-        // ── 2. Tạo project ─────────────────────────────────────────────────
+        // ── 2. Gán system role cho từng user ─────────────────────────────────
+        // admin đã được gán SUPER_ADMIN bởi DataInitializer; chỉ gán cho các user mới
+        assignSystemRole(nam,  roleProjectManager);
+        assignSystemRole(duc,  roleTeamLead);
+        assignSystemRole(lan,  roleMember);
+        assignSystemRole(tuan, roleMember);
+
+        // ── 3. Tạo project ───────────────────────────────────────────────────
         Project project = projectRepository.save(Project.builder()
                 .name("Nền tảng thương mại điện tử")
-                .description("Xây dựng nền tảng mua sắm trực tuyến với đầy đủ tính năng: quản lý sản phẩm, giỏ hàng, thanh toán, đơn hàng và báo cáo.")
+                .description("Xây dựng nền tảng mua sắm trực tuyến với đầy đủ tính năng: " +
+                        "quản lý sản phẩm, giỏ hàng, thanh toán, đơn hàng và báo cáo.")
                 .key("TMDT")
                 .owner(admin)
                 .color("#7c3aed")
@@ -85,14 +108,16 @@ public class DemoDataInitializer implements ApplicationRunner {
                 .isArchived(false)
                 .build());
 
-        // ── 3. Thêm thành viên — role phải thuộc (OWNER|ADMIN|MEMBER|VIEWER) ──
-        addMember(project, admin, "OWNER");
-        addMember(project, nam,   "ADMIN");
-        addMember(project, duc,   "MEMBER");
+        // ── 4. Thêm thành viên dự án ─────────────────────────────────────────
+        // Role trong dự án = system role của user (lấy từ getUserRoles())
+        // admin → SUPER_ADMIN, nam → PROJECT_MANAGER, duc → TEAM_LEAD, lan/tuan → MEMBER
+        addMember(project, admin, "OWNER");         // Chủ dự án (đặc biệt)
+        addMember(project, nam,   "PROJECT_MANAGER");
+        addMember(project, duc,   "TEAM_LEAD");
         addMember(project, lan,   "MEMBER");
         addMember(project, tuan,  "MEMBER");
 
-        // ── 4. Tạo Kanban board + columns (có mapped_status) ───────────────
+        // ── 5. Kanban board + columns ─────────────────────────────────────────
         Board board = boardRepository.save(Board.builder()
                 .project(project).name("Kanban Board").position(0)
                 .boardType(Board.BoardType.KANBAN)
@@ -104,7 +129,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         BoardColumn colReview = saveColumn(board, "Đang review", 2, "#f59e0b", Task.TaskStatus.IN_REVIEW,   false);
         BoardColumn colDone   = saveColumn(board, "Đã xong",     3, "#22c55e", Task.TaskStatus.DONE,        true);
 
-        // ── 5. Labels ──────────────────────────────────────────────────────
+        // ── 6. Labels ─────────────────────────────────────────────────────────
         Label lFe   = saveLabel(project, "Frontend",    "#3b82f6");
         Label lBe   = saveLabel(project, "Backend",     "#22c55e");
         Label lApi  = saveLabel(project, "API",         "#f59e0b");
@@ -113,13 +138,13 @@ public class DemoDataInitializer implements ApplicationRunner {
         Label lCrit = saveLabel(project, "Critical",    "#ef4444");
         Label lPerf = saveLabel(project, "Performance", "#f97316");
 
-        // ── 6. Issue categories ────────────────────────────────────────────
-        IssueCategory catBug     = saveCategory(project, "Bug",        tuan);
-        IssueCategory catFeature = saveCategory(project, "Tính năng",  duc);
-        IssueCategory catImprove = saveCategory(project, "Cải thiện",  null);
-        IssueCategory catDoc     = saveCategory(project, "Tài liệu",   nam);
+        // ── 7. Issue categories ───────────────────────────────────────────────
+        IssueCategory catBug     = saveCategory(project, "Bug",       tuan);
+        IssueCategory catFeature = saveCategory(project, "Tính năng", duc);
+        IssueCategory catImprove = saveCategory(project, "Cải thiện", null);
+        IssueCategory catDoc     = saveCategory(project, "Tài liệu",  nam);
 
-        // ── 7. Sprints — mỗi sprint tạo SCRUM board riêng ─────────────────
+        // ── 8. Sprints ────────────────────────────────────────────────────────
         Sprint sp1 = saveSprint(project, "Sprint 1 — Nền tảng",
                 "Thiết lập hạ tầng, xác thực người dùng, trang chủ cơ bản.",
                 Sprint.SprintStatus.COMPLETED,
@@ -145,14 +170,13 @@ public class DemoDataInitializer implements ApplicationRunner {
                 Sprint.SprintStatus.PLANNED,
                 LocalDate.of(2026, 4, 28), LocalDate.of(2026, 5, 11));
 
-        // Load sprint columns từ DB để dùng cho assignTasksToSprint
         Map<Task.TaskStatus, BoardColumn> sp1Cols = loadSprintColumns(sp1);
         Map<Task.TaskStatus, BoardColumn> sp2Cols = loadSprintColumns(sp2);
         Map<Task.TaskStatus, BoardColumn> sp3Cols = loadSprintColumns(sp3);
         Map<Task.TaskStatus, BoardColumn> sp4Cols = loadSprintColumns(sp4);
         Map<Task.TaskStatus, BoardColumn> sp5Cols = loadSprintColumns(sp5);
 
-        // ── 9. Tasks Sprint 1 (COMPLETED) ──────────────────────────────────
+        // ── 9. Tasks Sprint 1 (COMPLETED) ────────────────────────────────────
         Task t1 = saveTask(project, 1, "Thiết kế database schema",
                 "Thiết kế toàn bộ schema cho các bảng: users, products, orders, payments, categories.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
@@ -206,7 +230,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         addLabels(t5, lFe, lUx);
         addTimeLog(t5, lan, "Implement form login/register với React Hook Form", 7, LocalDate.of(2026, 1, 15));
 
-        // ── 10. Tasks Sprint 2 (COMPLETED) ─────────────────────────────────
+        // ── 10. Tasks Sprint 2 (COMPLETED) ───────────────────────────────────
         Task t6 = saveTask(project, 6, "Module quản lý sản phẩm",
                 "CRUD sản phẩm: tạo, sửa, xóa, phân trang, lọc theo category, tìm kiếm.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
@@ -257,7 +281,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         addLabels(t10, lBe);
         addTimeLog(t10, duc, "Implement file upload endpoint với validation", 6, LocalDate.of(2026, 1, 29));
 
-        // ── 11. Tasks Sprint 3 (COMPLETED) ─────────────────────────────────
+        // ── 11. Tasks Sprint 3 (COMPLETED) ───────────────────────────────────
         Task t11 = saveTask(project, 11, "Module giỏ hàng",
                 "API giỏ hàng: thêm/xóa/cập nhật số lượng sản phẩm, tính tổng tiền, kiểm tra tồn kho.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
@@ -310,7 +334,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         addTimeLog(t15, duc, "Implement Redis cache layer", 5, LocalDate.of(2026, 2, 13));
         addComment(t15, duc, "Sau khi thêm composite index (category_id, status, price) và cache Redis 5 phút, query xuống còn ~80ms. Đạt mục tiêu.");
 
-        // ── 12. Tasks Sprint 4 (ACTIVE) ────────────────────────────────────
+        // ── 12. Tasks Sprint 4 (ACTIVE) ──────────────────────────────────────
         Task t16 = saveTask(project, 16, "Module quản lý đơn hàng",
                 "API đơn hàng: tạo đơn, xem chi tiết, cập nhật trạng thái, hủy đơn, lịch sử.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.IN_PROGRESS,
@@ -322,7 +346,6 @@ public class DemoDataInitializer implements ApplicationRunner {
         addComment(t16, duc, "Đã xong API tạo đơn và lấy danh sách. Đang implement cập nhật trạng thái.");
         addComment(t16, nam, "Nhớ implement state machine cho order status: PENDING → CONFIRMED → SHIPPING → DELIVERED. Không cho phép nhảy cóc.");
 
-        // Subtask của t16 — nằm trong sprint (column = TODO của sp4)
         Task t16a = saveTask(project, 20, "Order state machine",
                 "Implement state machine kiểm soát luồng chuyển trạng thái đơn hàng.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.TODO,
@@ -361,7 +384,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         addComment(t19, tuan, "Reproduce: Thêm sản phẩm có 20% discount vào giỏ → giá ở CartPage hiển thị đúng → sang CheckoutPage giá lại thành giá gốc.");
         addComment(t19, lan,  "Root cause: CartPage tính discount ở frontend, CheckoutPage gọi lại API lấy price gốc. Đang fix để dùng discountedPrice từ API.");
 
-        // ── 13. Tasks Sprint 5 (PLANNED) ───────────────────────────────────
+        // ── 13. Tasks Sprint 5 (PLANNED) ─────────────────────────────────────
         Task t21 = saveTask(project, 21, "Hệ thống đánh giá sản phẩm",
                 "Cho phép người dùng đánh giá sao và viết nhận xét sản phẩm đã mua. Hiển thị trung bình rating.",
                 Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
@@ -403,22 +426,34 @@ public class DemoDataInitializer implements ApplicationRunner {
         addLabels(t25, lBe, lApi);
         addComment(t25, nam, "Cần confirm với stakeholder về các loại voucher trước khi implement. @nguyen.ducnv bạn có thể họp với PM tuần tới không?");
 
-        log.info("Demo data created successfully: project TMDT with 25 tasks across 5 sprints.");
+        log.info("Demo data created: project TMDT with 25 tasks across 5 sprints, 5 users with system roles.");
     }
 
-    // ── HELPER METHODS ──────────────────────────────────────────────────────
+    // ── Helper methods ────────────────────────────────────────────────────────
+
+    private Role findRole(String name) {
+        return roleRepository.findByName(name)
+                .orElseThrow(() -> new IllegalStateException(
+                        "System role '" + name + "' not found — DataInitializer may not have run yet"));
+    }
 
     private User createUser(String username, String fullName, String email) {
         return userRepository.findByEmail(email).orElseGet(() ->
-            userRepository.save(User.builder()
-                    .username(username)
-                    .email(email)
-                    .passwordHash(passwordEncoder.encode("Demo@123456"))
-                    .fullName(fullName)
-                    .isActive(true)
-                    .emailVerified(true)
-                    .mustChangePassword(false)
-                    .build()));
+                userRepository.save(User.builder()
+                        .username(username)
+                        .email(email)
+                        .passwordHash(passwordEncoder.encode("Demo@123456"))
+                        .fullName(fullName)
+                        .isActive(true)
+                        .emailVerified(true)
+                        .mustChangePassword(false)
+                        .build()));
+    }
+
+    private void assignSystemRole(User user, Role role) {
+        if (!userRoleRepository.existsByUserIdAndRoleId(user.getId(), role.getId())) {
+            userRoleRepository.save(UserRole.builder().user(user).role(role).build());
+        }
     }
 
     private void addMember(Project project, User user, String role) {
@@ -430,8 +465,7 @@ public class DemoDataInitializer implements ApplicationRunner {
                                    Task.TaskStatus mappedStatus, boolean isCompleted) {
         return boardColumnRepository.save(BoardColumn.builder()
                 .board(board).name(name).position(position).color(color)
-                .mappedStatus(mappedStatus)
-                .isCompleted(isCompleted)
+                .mappedStatus(mappedStatus).isCompleted(isCompleted)
                 .build());
     }
 
@@ -449,11 +483,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                               Sprint.SprintStatus status, LocalDate start, LocalDate end) {
         int nextPosition = boardRepository.findMaxPositionByProjectId(project.getId()).orElse(0) + 1;
         Board sprintBoard = boardRepository.save(Board.builder()
-                .project(project)
-                .name(name)
-                .position(nextPosition)
-                .boardType(Board.BoardType.SCRUM)
-                .isDefault(false)
+                .project(project).name(name).position(nextPosition)
+                .boardType(Board.BoardType.SCRUM).isDefault(false)
                 .build());
 
         boardColumnRepository.save(BoardColumn.builder().board(sprintBoard).name("To Do")      .position(0).color("#6B7280").mappedStatus(Task.TaskStatus.TODO)       .isCompleted(false).build());
@@ -464,8 +495,8 @@ public class DemoDataInitializer implements ApplicationRunner {
         boardColumnRepository.save(BoardColumn.builder().board(sprintBoard).name("Cancelled")  .position(5).color("#EF4444").mappedStatus(Task.TaskStatus.CANCELLED)  .isCompleted(false).build());
 
         Sprint sprint = Sprint.builder()
-                .project(project).board(sprintBoard).name(name).goal(goal).status(status)
-                .startDate(start).endDate(end)
+                .project(project).board(sprintBoard).name(name).goal(goal)
+                .status(status).startDate(start).endDate(end)
                 .build();
         if (status == Sprint.SprintStatus.COMPLETED) {
             sprint.setCompletedAt(end.atTime(17, 0));
@@ -473,14 +504,11 @@ public class DemoDataInitializer implements ApplicationRunner {
         return sprintRepository.save(sprint);
     }
 
-    /** Load sprint board columns từ DB thành map TaskStatus → BoardColumn */
     private Map<Task.TaskStatus, BoardColumn> loadSprintColumns(Sprint sprint) {
         List<BoardColumn> cols = boardColumnRepository.findByBoardIdOrderByPositionAsc(sprint.getBoard().getId());
         Map<Task.TaskStatus, BoardColumn> map = new HashMap<>();
         for (BoardColumn col : cols) {
-            if (col.getMappedStatus() != null) {
-                map.put(col.getMappedStatus(), col);
-            }
+            if (col.getMappedStatus() != null) map.put(col.getMappedStatus(), col);
         }
         return map;
     }
@@ -499,10 +527,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                 .assignee(assignee).reporter(reporter)
                 .startDate(startDate).dueDate(dueDate)
                 .estimatedHours(estimated).actualHours(actual)
-                .parentTask(parentTask)
-                .category(category)
-                .sprint(sprint)
-                .column(column).position(position)
+                .parentTask(parentTask).category(category)
+                .sprint(sprint).column(column).position(position)
                 .build();
         if (status == Task.TaskStatus.DONE || status == Task.TaskStatus.RESOLVED) {
             task.setCompletedAt(dueDate != null ? dueDate.atTime(16, 30) : LocalDateTime.now());

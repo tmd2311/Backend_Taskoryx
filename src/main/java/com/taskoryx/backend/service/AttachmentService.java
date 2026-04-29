@@ -225,8 +225,8 @@ public class AttachmentService {
         if (file.getSize() > appProperties.getStorage().getMaxFileSize()) {
             throw new BadRequestException("File quá lớn. Kích thước tối đa là 10MB");
         }
-        if (!appProperties.getStorage().getAllowedTypes().contains(file.getContentType())) {
-            throw new BadRequestException("Loại file không được hỗ trợ: " + file.getContentType());
+        if (!isAllowedFileType(file)) {
+            throw new BadRequestException("Loại file không được hỗ trợ: " + file.getOriginalFilename());
         }
 
         User uploader = userRepository.findById(principal.getId()).orElseThrow();
@@ -316,6 +316,30 @@ public class AttachmentService {
                 .totalCount(totalCount)
                 .byCategory(byCategory)
                 .build();
+    }
+
+    // Cho phép các extension phổ biến dù browser gửi sai MIME type (vd: application/octet-stream)
+    private static final List<String> ALLOWED_EXTENSIONS = List.of(
+            ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".html", ".css",
+            ".js", ".ts", ".jsx", ".tsx", ".java", ".kt", ".go", ".rs", ".c", ".cpp",
+            ".cs", ".rb", ".php", ".sh", ".bash", ".sql", ".r", ".swift",
+            ".csv", ".log", ".ini", ".toml", ".env",
+            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg",
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf",
+            ".zip", ".rar", ".7z", ".tar", ".gz"
+    );
+
+    private boolean isAllowedFileType(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType != null && appProperties.getStorage().getAllowedTypes().contains(contentType)) {
+            return true;
+        }
+        String filename = file.getOriginalFilename();
+        if (filename != null) {
+            String lower = filename.toLowerCase();
+            return ALLOWED_EXTENSIONS.stream().anyMatch(lower::endsWith);
+        }
+        return false;
     }
 
     private String saveFile(MultipartFile file, UUID taskId) throws IOException {

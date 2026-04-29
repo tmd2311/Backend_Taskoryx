@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
-// Roles là chuỗi tự do, admin tự định nghĩa. Hai giá trị đặc biệt: "OWNER", "ADMIN".
+// Roles là chuỗi tự do, admin tự định nghĩa. Hai giá trị đặc biệt: "OWNER", "PM".
 
 import java.time.LocalDateTime;
 import java.util.UUID;

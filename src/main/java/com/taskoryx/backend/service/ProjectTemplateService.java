@@ -2,6 +2,7 @@ package com.taskoryx.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskoryx.backend.dto.request.template.CreateProjectFromTemplateRequest;
+import com.taskoryx.backend.dto.request.template.CreateTemplateRequest;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
 import com.taskoryx.backend.dto.response.template.ProjectTemplateResponse;
 import com.taskoryx.backend.dto.response.template.TemplateColumnConfigDto;
@@ -266,84 +267,181 @@ public class ProjectTemplateService {
         return projectType.trim().toUpperCase().replace(' ', '_').replace('-', '_');
     }
 
+    // ── Admin CRUD ────────────────────────────────────────────────────────────
+
+    @Transactional
+    public ProjectTemplateResponse createTemplate(CreateTemplateRequest request, UserPrincipal principal) {
+        validateColumnsConfig(request.getColumnsConfig());
+        User creator = userRepository.findById(principal.getId()).orElseThrow();
+        ProjectTemplate template = ProjectTemplate.builder()
+                .name(request.getName())
+                .description(request.getDescription())
+                .category(request.getCategory())
+                .icon(request.getIcon())
+                .color(request.getColor())
+                .columnsConfig(request.getColumnsConfig())
+                .isPublic(Boolean.TRUE.equals(request.getIsPublic()))
+                .createdBy(creator)
+                .build();
+        return ProjectTemplateResponse.from(templateRepository.save(template));
+    }
+
+    @Transactional
+    public ProjectTemplateResponse updateTemplate(UUID templateId, CreateTemplateRequest request) {
+        ProjectTemplate template = templateRepository.findById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Template", "id", templateId));
+        validateColumnsConfig(request.getColumnsConfig());
+        template.setName(request.getName());
+        template.setDescription(request.getDescription());
+        template.setCategory(request.getCategory());
+        template.setIcon(request.getIcon());
+        template.setColor(request.getColor());
+        template.setColumnsConfig(request.getColumnsConfig());
+        template.setPublic(Boolean.TRUE.equals(request.getIsPublic()));
+        return ProjectTemplateResponse.from(templateRepository.save(template));
+    }
+
+    @Transactional
+    public void deleteTemplate(UUID templateId) {
+        if (!templateRepository.existsById(templateId)) {
+            throw new ResourceNotFoundException("Template", "id", templateId);
+        }
+        templateRepository.deleteById(templateId);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectTemplateResponse getTemplateById(UUID templateId) {
+        return ProjectTemplateResponse.from(
+                templateRepository.findById(templateId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Template", "id", templateId)));
+    }
+
+    private void validateColumnsConfig(String config) {
+        if (config == null || config.isBlank()) {
+            throw new BadRequestException("columnsConfig không được để trống");
+        }
+        try {
+            objectMapper.readValue(config, TemplateConfigDto.class);
+        } catch (Exception e) {
+            throw new BadRequestException("columnsConfig không hợp lệ: " + e.getMessage());
+        }
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void initDefaultTemplates() {
-        boolean hasSoftware = templateRepository.findAll().stream()
-                .anyMatch(t -> "Software".equals(t.getCategory()));
-        if (hasSoftware) return;
+        // Dùng count để kiểm tra idempotent — nếu đã có ≥ 6 template hệ thống thì bỏ qua
+        long systemCount = templateRepository.findAll().stream()
+                .filter(t -> t.getCreatedBy() == null)
+                .count();
+        if (systemCount >= 6) return;
 
         log.info("Initializing default project templates...");
 
-        // ── Template 1: Phát triển phần mềm (SCRUM) ─────────────────────────
-        // Có 4 sprint lên kế hoạch sẵn, mỗi sprint 2 tuần
-        createSystemTemplate("Phát triển phần mềm",
-            "Template cho dự án phát triển phần mềm theo Agile/Scrum. Tự động tạo sẵn 4 sprint.",
+        // ── 1. Phát triển phần mềm — SCRUM 4 sprint ─────────────────────────
+        upsertSystemTemplate("Phát triển phần mềm",
+            "Template Agile/Scrum cho dự án phần mềm. Tự động tạo sẵn 4 sprint lên kế hoạch.",
             "Software", "💻", "#1976d2",
+            "{\"projectType\":\"SOFTWARE\"," +
+            "\"boardType\":\"SCRUM\"," +
+            "\"enabledModules\":[\"SPRINT\",\"TIME_TRACKING\",\"ATTACHMENT\"]," +
+            "\"taskFields\":[\"priority\",\"dueDate\",\"estimatedHours\",\"assignee\",\"labels\",\"sprint\"]," +
+            "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}," +
+            "\"sprints\":[" +
+              "{\"name\":\"Sprint 1\",\"goal\":\"Thiết lập nền tảng và kiến trúc hệ thống\",\"durationWeeks\":2}," +
+              "{\"name\":\"Sprint 2\",\"goal\":\"Xây dựng tính năng cốt lõi\",\"durationWeeks\":2}," +
+              "{\"name\":\"Sprint 3\",\"goal\":\"Hoàn thiện và tích hợp các module\",\"durationWeeks\":2}," +
+              "{\"name\":\"Sprint 4\",\"goal\":\"Kiểm thử, sửa lỗi và ra mắt sản phẩm\",\"durationWeeks\":2}" +
+            "]}");
+
+        // ── 2. Dự án Startup — SCRUM 3 sprint ───────────────────────────────
+        upsertSystemTemplate("Dự án Startup",
+            "Template cho startup cần di chuyển nhanh — 3 sprint tập trung vào MVP.",
+            "Software", "🚀", "#7c3aed",
             "{\"projectType\":\"SOFTWARE\"," +
             "\"boardType\":\"SCRUM\"," +
             "\"enabledModules\":[\"SPRINT\",\"TIME_TRACKING\"]," +
             "\"taskFields\":[\"priority\",\"dueDate\",\"estimatedHours\",\"assignee\",\"labels\",\"sprint\"]," +
             "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}," +
             "\"sprints\":[" +
-              "{\"name\":\"Sprint 1\",\"goal\":\"Thiết lập nền tảng và kiến trúc hệ thống\",\"durationWeeks\":2}," +
-              "{\"name\":\"Sprint 2\",\"goal\":\"Xây dựng tính năng cốt lõi\",\"durationWeeks\":2}," +
-              "{\"name\":\"Sprint 3\",\"goal\":\"Hoàn thiện và tích hợp\",\"durationWeeks\":2}," +
-              "{\"name\":\"Sprint 4\",\"goal\":\"Kiểm thử, sửa lỗi và ra mắt\",\"durationWeeks\":2}" +
+              "{\"name\":\"Sprint 1 — Discovery\",\"goal\":\"Xác định vấn đề, nghiên cứu người dùng và lên kế hoạch MVP\",\"durationWeeks\":2}," +
+              "{\"name\":\"Sprint 2 — Build\",\"goal\":\"Xây dựng các tính năng cốt lõi của MVP\",\"durationWeeks\":3}," +
+              "{\"name\":\"Sprint 3 — Launch\",\"goal\":\"Kiểm thử, sửa lỗi và ra mắt MVP\",\"durationWeeks\":1}" +
             "]}");
 
-        // ── Template 2: Dự án Marketing (KANBAN) ────────────────────────────
-        createSystemTemplate("Dự án Marketing",
-            "Template cho chiến dịch marketing và truyền thông",
+        // ── 3. Nghiên cứu & Phát triển — SCRUM 5 sprint ─────────────────────
+        upsertSystemTemplate("Nghiên cứu & Phát triển",
+            "Template cho dự án R&D dài hạn với 5 sprint theo từng giai đoạn nghiên cứu.",
+            "Research", "🔬", "#0ea5e9",
+            "{\"projectType\":\"RESEARCH\"," +
+            "\"boardType\":\"SCRUM\"," +
+            "\"enabledModules\":[\"SPRINT\",\"TIME_TRACKING\",\"ATTACHMENT\"]," +
+            "\"taskFields\":[\"priority\",\"dueDate\",\"estimatedHours\",\"assignee\",\"labels\",\"sprint\"]," +
+            "\"evaluationConfig\":{\"onTimeWeight\":30,\"completionWeight\":40,\"timeAccuracyWeight\":20,\"engagementWeight\":10}," +
+            "\"sprints\":[" +
+              "{\"name\":\"Giai đoạn 1 — Khảo sát\",\"goal\":\"Thu thập và phân tích tài liệu, xác định phạm vi nghiên cứu\",\"durationWeeks\":2}," +
+              "{\"name\":\"Giai đoạn 2 — Thử nghiệm\",\"goal\":\"Xây dựng prototype và chạy thử nghiệm đầu tiên\",\"durationWeeks\":3}," +
+              "{\"name\":\"Giai đoạn 3 — Phân tích\",\"goal\":\"Phân tích kết quả thử nghiệm và điều chỉnh hướng nghiên cứu\",\"durationWeeks\":2}," +
+              "{\"name\":\"Giai đoạn 4 — Hoàn thiện\",\"goal\":\"Tối ưu mô hình / giải pháp và chuẩn bị báo cáo\",\"durationWeeks\":3}," +
+              "{\"name\":\"Giai đoạn 5 — Trình bày\",\"goal\":\"Viết báo cáo, demo kết quả và bàn giao\",\"durationWeeks\":2}" +
+            "]}");
+
+        // ── 4. Dự án Marketing (KANBAN) ──────────────────────────────────────
+        upsertSystemTemplate("Dự án Marketing",
+            "Template cho chiến dịch marketing và truyền thông số.",
             "Marketing", "📣", "#e91e63",
             "{\"projectType\":\"MARKETING\"," +
             "\"boardType\":\"KANBAN\"," +
             "\"enabledModules\":[\"ATTACHMENT\",\"APPROVAL\"]," +
             "\"columns\":[" +
-              "{\"name\":\"Ý tưởng\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
-              "{\"name\":\"Lên kế hoạch\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
-              "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
-              "{\"name\":\"Đánh giá\",\"color\":\"#8b5cf6\",\"isCompleted\":false}," +
-              "{\"name\":\"Hoàn thành\",\"color\":\"#22c55e\",\"isCompleted\":true}]," +
+              "{\"name\":\"Ý tưởng\",\"color\":\"#6b7280\",\"isCompleted\":false,\"mappedStatus\":\"TODO\"}," +
+              "{\"name\":\"Lên kế hoạch\",\"color\":\"#f59e0b\",\"isCompleted\":false,\"mappedStatus\":\"IN_PROGRESS\"}," +
+              "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false,\"mappedStatus\":\"IN_PROGRESS\"}," +
+              "{\"name\":\"Đánh giá\",\"color\":\"#8b5cf6\",\"isCompleted\":false,\"mappedStatus\":\"IN_REVIEW\"}," +
+              "{\"name\":\"Hoàn thành\",\"color\":\"#22c55e\",\"isCompleted\":true,\"mappedStatus\":\"DONE\"}]," +
             "\"taskFields\":[\"priority\",\"dueDate\",\"assignee\",\"labels\"]," +
             "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}}");
 
-        // ── Template 3: Thiết kế UI/UX (KANBAN) ─────────────────────────────
-        createSystemTemplate("Thiết kế UI/UX",
-            "Template cho dự án thiết kế giao diện và trải nghiệm người dùng",
+        // ── 5. Thiết kế UI/UX (KANBAN) ───────────────────────────────────────
+        upsertSystemTemplate("Thiết kế UI/UX",
+            "Template cho dự án thiết kế giao diện và trải nghiệm người dùng.",
             "Design", "🎨", "#9c27b0",
             "{\"projectType\":\"DESIGN\"," +
             "\"boardType\":\"KANBAN\"," +
-            "\"enabledModules\":[\"ATTACHMENT\",\"APPROVAL\",\"REVIEW\"]," +
+            "\"enabledModules\":[\"ATTACHMENT\",\"APPROVAL\"]," +
             "\"columns\":[" +
-              "{\"name\":\"Research\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
-              "{\"name\":\"Wireframe\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
-              "{\"name\":\"Design\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
-              "{\"name\":\"Review\",\"color\":\"#ef4444\",\"isCompleted\":false}," +
-              "{\"name\":\"Approved\",\"color\":\"#22c55e\",\"isCompleted\":true}]," +
+              "{\"name\":\"Research\",\"color\":\"#6b7280\",\"isCompleted\":false,\"mappedStatus\":\"TODO\"}," +
+              "{\"name\":\"Wireframe\",\"color\":\"#f59e0b\",\"isCompleted\":false,\"mappedStatus\":\"IN_PROGRESS\"}," +
+              "{\"name\":\"Thiết kế\",\"color\":\"#3b82f6\",\"isCompleted\":false,\"mappedStatus\":\"IN_PROGRESS\"}," +
+              "{\"name\":\"Review\",\"color\":\"#ef4444\",\"isCompleted\":false,\"mappedStatus\":\"IN_REVIEW\"}," +
+              "{\"name\":\"Approved\",\"color\":\"#22c55e\",\"isCompleted\":true,\"mappedStatus\":\"DONE\"}]," +
             "\"taskFields\":[\"priority\",\"dueDate\",\"assignee\",\"attachments\"]," +
             "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}}");
 
-        // ── Template 4: Quản lý sự kiện (KANBAN) ────────────────────────────
-        createSystemTemplate("Quản lý sự kiện",
-            "Template cho tổ chức và quản lý sự kiện",
+        // ── 6. Quản lý sự kiện (KANBAN) ──────────────────────────────────────
+        upsertSystemTemplate("Quản lý sự kiện",
+            "Template cho tổ chức và vận hành sự kiện từ lên kế hoạch đến kết thúc.",
             "Event", "🎪", "#ff5722",
             "{\"projectType\":\"EVENT\"," +
             "\"boardType\":\"KANBAN\"," +
-            "\"enabledModules\":[\"CHECKLIST\",\"MILESTONE\"]," +
+            "\"enabledModules\":[\"CHECKLIST\",\"ATTACHMENT\"]," +
             "\"columns\":[" +
-              "{\"name\":\"Lên kế hoạch\",\"color\":\"#6b7280\",\"isCompleted\":false}," +
-              "{\"name\":\"Chuẩn bị\",\"color\":\"#f59e0b\",\"isCompleted\":false}," +
-              "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false}," +
-              "{\"name\":\"Đã xong\",\"color\":\"#22c55e\",\"isCompleted\":true}]," +
+              "{\"name\":\"Lên kế hoạch\",\"color\":\"#6b7280\",\"isCompleted\":false,\"mappedStatus\":\"TODO\"}," +
+              "{\"name\":\"Chuẩn bị\",\"color\":\"#f59e0b\",\"isCompleted\":false,\"mappedStatus\":\"IN_PROGRESS\"}," +
+              "{\"name\":\"Đang thực hiện\",\"color\":\"#3b82f6\",\"isCompleted\":false,\"mappedStatus\":\"IN_PROGRESS\"}," +
+              "{\"name\":\"Đánh giá sau sự kiện\",\"color\":\"#8b5cf6\",\"isCompleted\":false,\"mappedStatus\":\"IN_REVIEW\"}," +
+              "{\"name\":\"Hoàn tất\",\"color\":\"#22c55e\",\"isCompleted\":true,\"mappedStatus\":\"DONE\"}]," +
             "\"taskFields\":[\"priority\",\"dueDate\",\"assignee\"]," +
             "\"evaluationConfig\":{\"onTimeWeight\":40,\"completionWeight\":30,\"timeAccuracyWeight\":20,\"engagementWeight\":10}}");
 
         log.info("Default templates initialized successfully");
     }
 
-    private void createSystemTemplate(String name, String description, String category,
-                                      String icon, String color, String columnsConfig) {
+    private void upsertSystemTemplate(String name, String description, String category,
+                                       String icon, String color, String columnsConfig) {
+        boolean exists = templateRepository.findAll().stream()
+                .anyMatch(t -> t.getCreatedBy() == null && name.equals(t.getName()));
+        if (exists) return;
         templateRepository.save(ProjectTemplate.builder()
                 .name(name)
                 .description(description)

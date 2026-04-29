@@ -1,6 +1,5 @@
 package com.taskoryx.backend.service;
 
-import com.taskoryx.backend.dto.request.role.ChangeMemberRoleRequest;
 import com.taskoryx.backend.dto.request.role.CreateProjectRoleRequest;
 import com.taskoryx.backend.dto.request.role.UpdateProjectRoleRequest;
 import com.taskoryx.backend.dto.response.role.ProjectRoleResponse;
@@ -26,7 +25,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProjectRoleService {
 
-    private static final Set<String> BUILT_IN_ROLES = Set.of("OWNER", "ADMIN", "MEMBER", "VIEWER");
+    // System roles — không thể dùng làm tên custom project role
+    private static final Set<String> RESERVED_ROLE_NAMES = Set.of(
+            "OWNER", "SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_LEAD", "MEMBER"
+    );
 
     private final ProjectRoleRepository projectRoleRepository;
     private final ProjectMemberRepository projectMemberRepository;
@@ -54,6 +56,9 @@ public class ProjectRoleService {
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
         Project project = projectService.findProjectWithAccess(projectId, principal.getId());
 
+        if (RESERVED_ROLE_NAMES.contains(request.getName().toUpperCase())) {
+            throw new BadRequestException("'" + request.getName() + "' là tên role hệ thống, không thể dùng làm custom role");
+        }
         if (projectRoleRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new BadRequestException("Vai trò '" + request.getName() + "' đã tồn tại trong dự án");
         }
@@ -115,36 +120,6 @@ public class ProjectRoleService {
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
 
         projectRoleRepository.delete(role);
-    }
-
-    /**
-     * Thay đổi role của thành viên trong project (chỉ Owner/Admin).
-     * Role có thể là built-in (OWNER/ADMIN/MEMBER/VIEWER) hoặc custom role đã tạo.
-     */
-    @Transactional
-    public void changeMemberRole(UUID projectId, UUID targetUserId, ChangeMemberRoleRequest request,
-                                  UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
-
-        ProjectMember target = projectMemberRepository.findByProjectIdAndUserId(projectId, targetUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("ProjectMember", "userId", targetUserId));
-
-        // Không cho phép thay đổi role của OWNER
-        if ("OWNER".equals(target.getRole())) {
-            throw new BadRequestException("Không thể thay đổi vai trò của OWNER");
-        }
-
-        String newRole = request.getRole();
-
-        // Validate: role phải là built-in hoặc tồn tại trong custom roles của project
-        boolean isBuiltIn = BUILT_IN_ROLES.contains(newRole);
-        boolean isCustom = projectRoleRepository.existsByProjectIdAndName(projectId, newRole);
-        if (!isBuiltIn && !isCustom) {
-            throw new BadRequestException("Vai trò '" + newRole + "' không tồn tại trong dự án");
-        }
-
-        target.setRole(newRole);
-        projectMemberRepository.save(target);
     }
 
     private void validatePermissions(List<String> permissions) {

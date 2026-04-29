@@ -2,17 +2,14 @@ package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.entity.Project;
 import com.taskoryx.backend.entity.ProjectPermission;
-import com.taskoryx.backend.entity.ProjectRole;
 import com.taskoryx.backend.exception.ForbiddenException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.ProjectRepository;
-import com.taskoryx.backend.repository.ProjectRoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,7 +32,6 @@ public class ProjectAuthorizationService {
 
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
-    private final ProjectRoleRepository projectRoleRepository;
 
     public Project requireProjectAccess(UUID projectId, UUID userId) {
         Project project = findProject(projectId);
@@ -48,7 +44,7 @@ public class ProjectAuthorizationService {
     public Project requireProjectAdmin(UUID projectId, UUID userId) {
         Project project = findProject(projectId);
         if (!hasProjectAdmin(project, userId)) {
-            throw new ForbiddenException("Bạn cần quyền ADMIN hoặc OWNER để thực hiện thao tác này");
+            throw new ForbiddenException("Bạn cần quyền PROJECT_MANAGER, SUPER_ADMIN hoặc OWNER để thực hiện thao tác này");
         }
         return project;
     }
@@ -97,7 +93,9 @@ public class ProjectAuthorizationService {
             return false;
         }
 
-        if ("OWNER".equals(roleName) || "ADMIN".equals(roleName)) {
+        if ("OWNER".equals(roleName)
+                || "SUPER_ADMIN".equals(roleName)
+                || "PROJECT_MANAGER".equals(roleName)) {
             return true;
         }
 
@@ -114,6 +112,27 @@ public class ProjectAuthorizationService {
 
     private Set<String> resolvePermissions(UUID projectId, String roleName) {
         return switch (roleName) {
+            // SUPER_ADMIN và PROJECT_MANAGER đã được xử lý ở checkAccess (return true luôn)
+            // TEAM_LEAD — quản lý task/sprint, xem báo cáo, không xóa dự án/thành viên
+            case "TEAM_LEAD" -> Set.of(
+                    ProjectPermission.TASK_VIEW,
+                    ProjectPermission.TASK_CREATE,
+                    ProjectPermission.TASK_UPDATE,
+                    ProjectPermission.TASK_DELETE,
+                    ProjectPermission.TASK_ASSIGN,
+                    ProjectPermission.COMMENT_CREATE,
+                    ProjectPermission.COMMENT_DELETE,
+                    ProjectPermission.ATTACHMENT_MANAGE,
+                    ProjectPermission.TIME_TRACKING_VIEW,
+                    ProjectPermission.TIME_TRACKING_MANAGE,
+                    ProjectPermission.LABEL_MANAGE,
+                    ProjectPermission.CATEGORY_MANAGE,
+                    ProjectPermission.BOARD_VIEW,
+                    ProjectPermission.BOARD_UPDATE,
+                    ProjectPermission.SPRINT_MANAGE,
+                    ProjectPermission.REPORT_VIEW
+            );
+            // MEMBER — làm việc với task, không quản lý sprint/thành viên
             case "MEMBER" -> Set.of(
                     ProjectPermission.TASK_VIEW,
                     ProjectPermission.TASK_CREATE,
@@ -123,19 +142,15 @@ public class ProjectAuthorizationService {
                     ProjectPermission.ATTACHMENT_MANAGE,
                     ProjectPermission.TIME_TRACKING_VIEW,
                     ProjectPermission.TIME_TRACKING_MANAGE,
-                    ProjectPermission.LABEL_MANAGE,
                     ProjectPermission.BOARD_VIEW
             );
-            case "VIEWER" -> Set.of(
+            // ADMIN (system) trong dự án — xem task, không chỉnh sửa nội dung dự án
+            case "ADMIN" -> Set.of(
                     ProjectPermission.TASK_VIEW,
                     ProjectPermission.BOARD_VIEW,
-                    ProjectPermission.TIME_TRACKING_VIEW
+                    ProjectPermission.REPORT_VIEW
             );
-            default -> projectRoleRepository.findByProjectIdAndName(projectId, roleName)
-                    .map(ProjectRole::getPermissionList)
-                    .map(List::copyOf)
-                    .map(Set::copyOf)
-                    .orElse(Set.of());
+            default -> Set.of();
         };
     }
 }
