@@ -20,7 +20,7 @@ import com.taskoryx.backend.repository.UserRepository;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -35,10 +35,6 @@ import org.springframework.web.util.UriUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
@@ -72,6 +68,7 @@ public class AttachmentService {
     private final ProjectAuthorizationService projectAuthorizationService;
     private final ProjectCapabilityService projectCapabilityService;
     private final AppProperties appProperties;
+    private final StorageService storageService;
 
     /**
      * Lấy danh sách file đính kèm của một task, có thể lọc theo FileCategory.
@@ -186,10 +183,10 @@ public class AttachmentService {
         projectAuthorizationService.requirePermission(attachment.getTask().getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_VIEW);
 
-        Path filePath = Paths.get(appProperties.getStorage().getUploadDir())
-                .resolve(attachment.getStoragePath());
-        Resource resource = new FileSystemResource(filePath);
-        if (!resource.exists()) {
+        Resource resource;
+        try {
+            resource = new InputStreamResource(storageService.load(attachment.getStoragePath()));
+        } catch (IOException e) {
             throw new ResourceNotFoundException("File", "storage", attachmentId);
         }
 
@@ -241,8 +238,9 @@ public class AttachmentService {
             }
         }
 
-        String storagePath = saveFile(file, taskId);
-        String fileUrl = "/api/attachments/files/" + storagePath;
+        String relativePath = "tasks/" + taskId + "/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
+        String fileUrl = storageService.store(file, relativePath);
+        String storagePath = relativePath;
 
         Attachment attachment = Attachment.builder()
                 .task(task)
@@ -284,14 +282,7 @@ public class AttachmentService {
             throw new ForbiddenException("Bạn không có quyền xóa file này");
         }
 
-        try {
-            Path filePath = Paths.get(appProperties.getStorage().getUploadDir())
-                    .resolve(attachment.getStoragePath());
-            Files.deleteIfExists(filePath);
-        } catch (IOException e) {
-            log.error("Failed to delete file: {}", attachment.getStoragePath(), e);
-        }
-
+        storageService.delete(attachment.getStoragePath());
         attachmentRepository.delete(attachment);
     }
 
@@ -342,12 +333,4 @@ public class AttachmentService {
         return false;
     }
 
-    private String saveFile(MultipartFile file, UUID taskId) throws IOException {
-        String uploadDir = appProperties.getStorage().getUploadDir();
-        String relativePath = "tasks/" + taskId + "/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
-        Path targetPath = Paths.get(uploadDir).resolve(relativePath);
-        Files.createDirectories(targetPath.getParent());
-        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-        return relativePath;
-    }
 }

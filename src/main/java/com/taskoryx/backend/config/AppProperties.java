@@ -19,6 +19,7 @@ public class AppProperties {
 
     private Cors cors = new Cors();
     private Storage storage = new Storage();
+    private S3 s3 = new S3();
 
     @Getter
     @Setter
@@ -65,5 +66,16 @@ public class AppProperties {
                 "application/x-sh", "text/x-shellscript",
                 "application/x-yaml", "text/yaml"
         );
+    }
+
+    @Getter
+    @Setter
+    public static class S3 {
+        private String bucket;
+        private String region = "ap-southeast-1";
+        private String accessKey;
+        private String secretKey;
+        // Public base URL để trả về cho client (vd: https://bucket.s3.region.amazonaws.com)
+        private String publicBaseUrl;
     }
 }

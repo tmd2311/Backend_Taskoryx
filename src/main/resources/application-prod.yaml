@@ -61,6 +61,12 @@ application:
       - ${CORS_ORIGIN_2}
   storage:
     upload-dir: ${UPLOAD_DIR:/home/ubuntu/taskoryx-backend/uploads}
+  s3:
+    bucket: ${S3_BUCKET}
+    region: ${S3_REGION:ap-southeast-1}
+    access-key: ${S3_ACCESS_KEY}
+    secret-key: ${S3_SECRET_KEY}
+    public-base-url: ${S3_PUBLIC_BASE_URL}
 
 # ==================== LOGGING ====================
 logging:

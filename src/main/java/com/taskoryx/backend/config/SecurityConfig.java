@@ -42,7 +42,8 @@ public class SecurityConfig {
             "/v3/api-docs/**",
             "/actuator/health",
             "/ws/**",
-            "/templates/public"
+            "/templates/public",
+            "/files/**"
     };
 
     @Bean

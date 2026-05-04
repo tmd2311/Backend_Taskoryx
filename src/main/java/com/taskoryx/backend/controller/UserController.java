@@ -14,10 +14,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +29,7 @@ import java.util.UUID;
  *
  * GET    /api/users/me                  - Lấy thông tin cá nhân
  * PUT    /api/users/me                  - Cập nhật thông tin cá nhân
+ * POST   /api/users/me/avatar           - Upload ảnh đại diện (multipart/form-data)
  * PUT    /api/users/me/password         - Đổi mật khẩu
  * GET    /api/users/me/performance      - Điểm hiệu suất trên tất cả projects
  * GET    /api/users/{id}                - Lấy thông tin user khác
@@ -54,6 +58,15 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thành công",
                 userService.updateProfile(principal, request)));
+    }
+
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload ảnh đại diện (JPEG/PNG/GIF/WEBP, tối đa 5MB)")
+    public ResponseEntity<ApiResponse<UserResponse>> uploadAvatar(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công",
+                userService.uploadAvatar(principal, file)));
     }
 
     @GetMapping("/me/performance")
