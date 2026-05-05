@@ -1,5 +1,6 @@
 package com.taskoryx.backend.service;
 
+import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.dto.response.watcher.WatcherResponse;
 import com.taskoryx.backend.entity.*;
 import com.taskoryx.backend.exception.BadRequestException;
@@ -65,6 +66,13 @@ public class TaskWatcherService {
     @Transactional(readOnly = true)
     public boolean isWatching(UUID taskId, UserPrincipal principal) {
         return watcherRepository.existsByTaskIdAndUserId(taskId, principal.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskSummaryResponse> getWatchedTasks(UserPrincipal principal) {
+        return watcherRepository.findByUserId(principal.getId()).stream()
+                .map(w -> TaskSummaryResponse.from(w.getTask()))
+                .collect(Collectors.toList());
     }
 
     @Async

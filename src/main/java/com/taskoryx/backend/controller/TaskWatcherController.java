@@ -1,5 +1,6 @@
 package com.taskoryx.backend.controller;
 
+import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.dto.response.watcher.WatcherResponse;
 import com.taskoryx.backend.security.UserPrincipal;
 import com.taskoryx.backend.service.TaskWatcherService;
@@ -16,14 +17,20 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/tasks/{taskId}/watchers")
 @RequiredArgsConstructor
 @Tag(name = "Task Watchers", description = "Theo dõi task để nhận thông báo")
 public class TaskWatcherController {
 
     private final TaskWatcherService watcherService;
 
-    @PostMapping
+    @GetMapping("/users/me/watched-tasks")
+    @Operation(summary = "Lấy danh sách task mà tôi đang theo dõi")
+    public ResponseEntity<List<TaskSummaryResponse>> getMyWatchedTasks(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(watcherService.getWatchedTasks(principal));
+    }
+
+    @PostMapping("/tasks/{taskId}/watchers")
     @Operation(summary = "Theo dõi task (watch)")
     public ResponseEntity<WatcherResponse> watchTask(
             @PathVariable UUID taskId,
@@ -32,7 +39,7 @@ public class TaskWatcherController {
                 .body(watcherService.watchTask(taskId, principal));
     }
 
-    @DeleteMapping
+    @DeleteMapping("/tasks/{taskId}/watchers")
     @Operation(summary = "Bỏ theo dõi task (unwatch)")
     public ResponseEntity<Void> unwatchTask(
             @PathVariable UUID taskId,
@@ -41,7 +48,7 @@ public class TaskWatcherController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping
+    @GetMapping("/tasks/{taskId}/watchers")
     @Operation(summary = "Lấy danh sách người đang theo dõi task")
     public ResponseEntity<List<WatcherResponse>> getWatchers(
             @PathVariable UUID taskId,
@@ -49,7 +56,7 @@ public class TaskWatcherController {
         return ResponseEntity.ok(watcherService.getWatchers(taskId, principal));
     }
 
-    @GetMapping("/status")
+    @GetMapping("/tasks/{taskId}/watchers/status")
     @Operation(summary = "Kiểm tra bạn có đang theo dõi task không")
     public ResponseEntity<Map<String, Boolean>> isWatching(
             @PathVariable UUID taskId,
