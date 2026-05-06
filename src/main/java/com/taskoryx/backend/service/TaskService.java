@@ -673,6 +673,7 @@ public class TaskService {
 
         if (excludeTaskId == null) {
             return candidates.stream()
+                    .filter(t -> t.getParentTask() == null)
                     .map(TaskSummaryResponse::from)
                     .collect(Collectors.toList());
         }
@@ -681,6 +682,7 @@ public class TaskService {
         Set<UUID> excludedIds = collectSubTreeIds(excludeTaskId);
 
         return candidates.stream()
+                .filter(t -> t.getParentTask() == null)
                 .filter(t -> !excludedIds.contains(t.getId()))
                 .map(TaskSummaryResponse::from)
                 .collect(Collectors.toList());
