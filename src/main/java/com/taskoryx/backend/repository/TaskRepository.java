@@ -98,8 +98,11 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
     List<Task> findByParentTaskId(UUID parentTaskId);
 
     // Tasks thuộc project, không phải cấp 3 (parentTask.parentTask IS NULL → cấp 1 hoặc cấp 2)
-    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId " +
-           "AND (t.parentTask IS NULL OR t.parentTask.parentTask IS NULL) " +
-           "ORDER BY t.taskNumber ASC")
+    @Query(value = "SELECT t.* FROM tasks t " +
+                   "LEFT JOIN tasks p ON t.parent_id = p.id " +
+                   "WHERE t.project_id = :projectId " +
+                   "AND (t.parent_id IS NULL OR p.parent_id IS NULL) " +
+                   "ORDER BY t.task_number ASC",
+           nativeQuery = true)
     List<Task> findValidParentCandidates(@Param("projectId") UUID projectId);
 }

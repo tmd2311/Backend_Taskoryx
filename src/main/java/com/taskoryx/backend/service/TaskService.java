@@ -14,6 +14,7 @@ import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.*;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TaskService {
 
     private final TaskRepository taskRepository;
@@ -667,6 +669,7 @@ public class TaskService {
                                                           UserPrincipal principal) {
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_VIEW);
         List<Task> candidates = taskRepository.findValidParentCandidates(projectId);
+        log.debug("findValidParentCandidates projectId={} → {} tasks", projectId, candidates.size());
 
         if (excludeTaskId == null) {
             return candidates.stream()
