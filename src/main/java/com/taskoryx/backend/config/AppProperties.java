@@ -78,4 +78,31 @@ public class AppProperties {
         // Public base URL để trả về cho client (vd: https://bucket.s3.region.amazonaws.com)
         private String publicBaseUrl;
     }
+
+    private Ai ai = new Ai();
+
+    @Getter
+    @Setter
+    public static class Ai {
+        /** Provider đang dùng: gemini | openai */
+        private String provider = "gemini";
+        private Gemini gemini = new Gemini();
+        private Openai openai = new Openai();
+
+        @Getter
+        @Setter
+        public static class Gemini {
+            // KEY_REF: AI_KEYS_001 — xem phiếu yêu cầu API_KEYS_REQUEST.md
+            private String apiKey = "GEMINI_API_KEY_PLACEHOLDER";
+            private String model = "gemini-2.0-flash";
+        }
+
+        @Getter
+        @Setter
+        public static class Openai {
+            // KEY_REF: AI_KEYS_002 — xem phiếu yêu cầu API_KEYS_REQUEST.md
+            private String apiKey = "OPENAI_API_KEY_PLACEHOLDER";
+            private String model = "gpt-4o-mini";
+        }
+    }
 }

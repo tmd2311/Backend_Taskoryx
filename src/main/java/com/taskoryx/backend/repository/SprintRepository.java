@@ -27,4 +27,6 @@ public interface SprintRepository extends JpaRepository<Sprint, UUID> {
     Optional<Sprint> findActiveSprintByProjectId(@Param("projectId") UUID projectId);
 
     Optional<Sprint> findByBoardId(UUID boardId);
+
+    Optional<Sprint> findFirstByProjectIdOrderByCreatedAtAsc(UUID projectId);
 }

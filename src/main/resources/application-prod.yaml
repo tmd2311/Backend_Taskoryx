@@ -61,6 +61,14 @@ application:
       - ${CORS_ORIGIN_2}
   storage:
     upload-dir: ${UPLOAD_DIR:/home/ubuntu/taskoryx-backend/uploads}
+  ai:
+    provider: ${AI_PROVIDER:gemini}
+    gemini:
+      api-key: ${GEMINI_API_KEY}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${OPENAI_MODEL:gpt-4o-mini}
   s3:
     bucket: ${S3_BUCKET}
     region: ${S3_REGION:ap-southeast-1}

@@ -104,6 +104,16 @@ application:
     upload-dir: uploads
     max-file-size: 10485760
 
+  # ==================== AI CONFIGURATION ====================
+  ai:
+    provider: ${AI_PROVIDER:gemini}         # gemini | openai
+    gemini:
+      api-key: ${GEMINI_API_KEY:GEMINI_KEY_NOT_SET}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+    openai:
+      api-key: ${OPENAI_API_KEY:OPENAI_KEY_NOT_SET}
+      model: ${OPENAI_MODEL:gpt-4o-mini}
+
 # ==================== LOGGING CONFIGURATION ====================
 logging:
   level:
