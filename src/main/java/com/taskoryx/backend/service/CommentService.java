@@ -3,6 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.dto.request.comment.CreateCommentRequest;
 import com.taskoryx.backend.dto.request.comment.UpdateCommentRequest;
 import com.taskoryx.backend.dto.response.comment.CommentResponse;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.entity.Comment;
 import com.taskoryx.backend.entity.CommentMention;
 import com.taskoryx.backend.entity.ProjectPermission;
@@ -37,6 +38,7 @@ public class CommentService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ActivityLogService activityLogService;
 
     // Pattern để tìm @username trong comment
     private static final Pattern MENTION_PATTERN = Pattern.compile("@([a-zA-Z0-9_-]+)");
@@ -88,6 +90,10 @@ public class CommentService {
                 task.getAssignee() != null ? task.getAssignee().getId() : null,
                 task.getReporter().getId());
 
+        activityLogService.logActivity(author, task.getProject(),
+                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.CREATE,
+                null, "{\"taskId\":\"" + task.getId() + "\",\"taskKey\":\"" + task.getTaskKey() + "\"}");
+
         return CommentResponse.from(comment);
     }
 
@@ -111,6 +117,10 @@ public class CommentService {
         comment = commentRepository.save(comment);
         processMentions(comment, comment.getTask(), comment.getUser());
 
+        activityLogService.logActivity(comment.getUser(), comment.getTask().getProject(),
+                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.UPDATE,
+                null, "{\"taskId\":\"" + comment.getTask().getId() + "\"}");
+
         return CommentResponse.from(commentRepository.save(comment));
     }
 
@@ -124,6 +134,12 @@ public class CommentService {
                 principal.getId(), ProjectPermission.COMMENT_DELETE)) {
             throw new ForbiddenException("Bạn không có quyền xóa bình luận này");
         }
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, comment.getTask().getProject(),
+                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.DELETE,
+                "{\"taskId\":\"" + comment.getTask().getId() + "\"}", null);
+
         commentRepository.delete(comment);
     }
 

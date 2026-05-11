@@ -9,6 +9,7 @@ import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import com.taskoryx.backend.dto.response.task.TaskResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.*;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.*;
@@ -52,6 +53,7 @@ public class TaskService {
     private final IssueCategoryRepository issueCategoryRepository;
     private final SprintRepository sprintRepository;
     private final TaskWatcherService taskWatcherService;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public TaskResponse createTask(UUID projectId, CreateTaskRequest request, UserPrincipal principal) {
@@ -133,6 +135,10 @@ public class TaskService {
                     assignee.getId(), reporter.getFullName(),
                     task.getId(), task.getTitle(), project.getName());
         }
+
+        activityLogService.logActivity(reporter, project,
+                ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.CREATE,
+                null, "{\"taskKey\":\"" + task.getTaskKey() + "\",\"title\":\"" + task.getTitle() + "\"}");
 
         return TaskResponse.from(taskRepository.findById(task.getId()).orElseThrow());
     }
@@ -265,6 +271,11 @@ public class TaskService {
                 "Task được cập nhật",
                 "Task '" + saved.getTitle() + "' đã được cập nhật");
 
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, saved.getProject(),
+                ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.UPDATE,
+                null, "{\"taskKey\":\"" + saved.getTaskKey() + "\",\"title\":\"" + saved.getTitle() + "\"}");
+
         return TaskResponse.from(saved);
     }
 
@@ -314,7 +325,14 @@ public class TaskService {
             task.setCompletedAt(null);
         }
 
-        return TaskResponse.from(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, saved.getProject(),
+                ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.MOVE,
+                null, "{\"columnId\":\"" + targetColumn.getId() + "\",\"columnName\":\"" + targetColumn.getName() + "\"}");
+
+        return TaskResponse.from(saved);
     }
 
     @Transactional
@@ -323,6 +341,12 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_DELETE);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, task.getProject(),
+                ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.DELETE,
+                "{\"taskKey\":\"" + task.getTaskKey() + "\",\"title\":\"" + task.getTitle() + "\"}", null);
+
         taskRepository.delete(task);
     }
 
@@ -340,8 +364,17 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_UPDATE);
+        String oldStatus = task.getStatus().name();
         applyStatus(task, request.getStatus());
-        return TaskResponse.from(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, saved.getProject(),
+                ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.UPDATE,
+                "{\"status\":\"" + oldStatus + "\"}",
+                "{\"status\":\"" + saved.getStatus().name() + "\"}");
+
+        return TaskResponse.from(saved);
     }
 
     /**

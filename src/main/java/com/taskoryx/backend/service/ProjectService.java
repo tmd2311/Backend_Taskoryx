@@ -2,6 +2,7 @@ package com.taskoryx.backend.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.dto.request.project.AddMemberRequest;
 import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
 import com.taskoryx.backend.dto.request.project.UpdateProjectRequest;
@@ -46,6 +47,7 @@ public class ProjectService {
     private final ProjectAuthorizationService projectAuthorizationService;
     private final ProjectCapabilityService projectCapabilityService;
     private final ObjectMapper objectMapper;
+    private final ActivityLogService activityLogService;
 
     @Transactional(readOnly = true)
     public List<ProjectResponse> getMyProjects(UserPrincipal principal) {
@@ -94,6 +96,10 @@ public class ProjectService {
         // Tạo board mặc định
         createDefaultBoard(project);
 
+        activityLogService.logActivity(owner, project,
+                ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.CREATE,
+                null, "{\"name\":\"" + project.getName() + "\",\"key\":\"" + project.getKey() + "\"}");
+
         ProjectResponse response = ProjectResponse.from(project);
         response.setCurrentUserRole("OWNER");
         return response;
@@ -124,7 +130,12 @@ public class ProjectService {
         if (request.getIsPublic() != null) project.setIsPublic(request.getIsPublic());
         if (request.getIsArchived() != null) project.setIsArchived(request.getIsArchived());
 
-        return ProjectResponse.from(projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, saved,
+                ActivityLog.EntityType.PROJECT, saved.getId(), ActivityLog.Action.UPDATE,
+                null, "{\"name\":\"" + saved.getName() + "\"}");
+        return ProjectResponse.from(saved);
     }
 
     @Transactional
@@ -199,7 +210,14 @@ public class ProjectService {
                 .user(newMember)
                 .role(projectRole)
                 .build();
-        return ProjectMemberResponse.from(projectMemberRepository.save(member));
+        ProjectMemberResponse response = ProjectMemberResponse.from(projectMemberRepository.save(member));
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, project,
+                ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.UPDATE,
+                null, "{\"action\":\"ADD_MEMBER\",\"userId\":\"" + newMember.getId() + "\",\"email\":\"" + newMember.getEmail() + "\"}");
+
+        return response;
     }
 
     @Transactional
@@ -210,6 +228,11 @@ public class ProjectService {
         if ("OWNER".equals(member.getRole())) {
             throw new ForbiddenException("Không thể xóa chủ sở hữu khỏi dự án");
         }
+        Project project = member.getProject();
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, project,
+                ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.UPDATE,
+                "{\"action\":\"REMOVE_MEMBER\",\"userId\":\"" + userId + "\"}", null);
         projectMemberRepository.delete(member);
     }
 

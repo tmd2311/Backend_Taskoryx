@@ -3,6 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.config.AppProperties;
 import com.taskoryx.backend.dto.response.attachment.AttachmentResponse;
 import com.taskoryx.backend.dto.response.attachment.AttachmentStatsResponse;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.entity.Attachment;
 import com.taskoryx.backend.entity.Comment;
 import com.taskoryx.backend.entity.FileCategory;
@@ -69,6 +70,7 @@ public class AttachmentService {
     private final ProjectCapabilityService projectCapabilityService;
     private final AppProperties appProperties;
     private final StorageService storageService;
+    private final ActivityLogService activityLogService;
 
     /**
      * Lấy danh sách file đính kèm của một task, có thể lọc theo FileCategory.
@@ -253,7 +255,13 @@ public class AttachmentService {
                 .storagePath(storagePath)
                 .build();
 
-        return AttachmentResponse.from(attachmentRepository.save(attachment));
+        AttachmentResponse response = AttachmentResponse.from(attachmentRepository.save(attachment));
+
+        activityLogService.logActivity(uploader, task.getProject(),
+                ActivityLog.EntityType.ATTACHMENT, attachment.getId(), ActivityLog.Action.CREATE,
+                null, "{\"fileName\":\"" + attachment.getFileName() + "\",\"taskId\":\"" + task.getId() + "\"}");
+
+        return response;
     }
 
     /**
@@ -281,6 +289,11 @@ public class AttachmentService {
                 principal.getId(), ProjectPermission.ATTACHMENT_MANAGE)) {
             throw new ForbiddenException("Bạn không có quyền xóa file này");
         }
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, attachment.getTask().getProject(),
+                ActivityLog.EntityType.ATTACHMENT, attachment.getId(), ActivityLog.Action.DELETE,
+                "{\"fileName\":\"" + attachment.getFileName() + "\",\"taskId\":\"" + attachment.getTask().getId() + "\"}", null);
 
         storageService.delete(attachment.getStoragePath());
         attachmentRepository.delete(attachment);

@@ -5,12 +5,14 @@ import com.taskoryx.backend.dto.request.sprint.UpdateSprintRequest;
 import com.taskoryx.backend.dto.response.board.KanbanBoardResponse;
 import com.taskoryx.backend.dto.response.sprint.SprintResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.Project;
 import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.Sprint;
 import com.taskoryx.backend.entity.Task;
+import com.taskoryx.backend.repository.UserRepository;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.BoardColumnRepository;
@@ -41,6 +43,8 @@ public class SprintService {
     private final BoardService boardService;
     private final ProjectAuthorizationService projectAuthorizationService;
     private final ProjectCapabilityService projectCapabilityService;
+    private final ActivityLogService activityLogService;
+    private final UserRepository userRepository;
 
     // ========== CREATE ==========
 
@@ -198,6 +202,13 @@ public class SprintService {
         }
 
         sprint = sprintRepository.save(sprint);
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, sprint.getProject(),
+                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.UPDATE,
+                "{\"status\":\"PLANNED\"}",
+                "{\"status\":\"ACTIVE\",\"sprintName\":\"" + sprint.getName() + "\"}");
+
         return SprintResponse.fromWithTasks(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
@@ -217,6 +228,13 @@ public class SprintService {
         sprint.setCompletedAt(LocalDateTime.now());
 
         sprint = sprintRepository.save(sprint);
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        activityLogService.logActivity(actor, sprint.getProject(),
+                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.COMPLETE,
+                "{\"status\":\"ACTIVE\"}",
+                "{\"status\":\"COMPLETED\",\"sprintName\":\"" + sprint.getName() + "\"}");
+
         return SprintResponse.fromWithTasks(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
