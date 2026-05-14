@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,9 +25,10 @@ public class AiProjectPlanController {
     private final AiProjectPlanService aiProjectPlanService;
 
     @PostMapping("/generate")
+    @PreAuthorize("hasAuthority('PROJECT_CREATE')")
     @Operation(
         summary = "Sinh kế hoạch dự án bằng AI",
-        description = "Nhận yêu cầu ngôn ngữ tự nhiên, trả preview kế hoạch (chưa ghi DB)"
+        description = "Nhận yêu cầu ngôn ngữ tự nhiên, trả preview kế hoạch (chưa ghi DB). Yêu cầu quyền PROJECT_CREATE (PROJECT_MANAGER hoặc SUPER_ADMIN)."
     )
     public ApiResponse<AiPlanPreviewResponse> generatePlan(
             @Valid @RequestBody AiGeneratePlanRequest request) {
@@ -36,9 +38,10 @@ public class AiProjectPlanController {
 
     @PostMapping("/confirm")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PROJECT_CREATE')")
     @Operation(
         summary = "Xác nhận và tạo dự án từ kế hoạch AI",
-        description = "Nhận kế hoạch đã xem trước, thực thi tạo Project + Task thật trong DB"
+        description = "Nhận kế hoạch đã xem trước, thực thi tạo Project + Task thật trong DB. Yêu cầu quyền PROJECT_CREATE (PROJECT_MANAGER hoặc SUPER_ADMIN)."
     )
     public ApiResponse<AiExecuteResult> confirmPlan(
             @Valid @RequestBody AiConfirmPlanRequest request,
