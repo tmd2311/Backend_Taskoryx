@@ -28,7 +28,7 @@
 
 ## Tổng quan
 
-**Taskoryx** là hệ thống REST API hỗ trợ quản lý công việc theo quy trình Agile/Scrum. Backend cung cấp toàn bộ nghiệp vụ: xác thực JWT, phân quyền RBAC, Kanban board, Sprint planning, theo dõi thời gian, thông báo thời gian thực qua WebSocket.
+**Taskoryx** là hệ thống REST API hỗ trợ quản lý công việc theo quy trình Agile/Scrum. Backend cung cấp toàn bộ nghiệp vụ: xác thực JWT + 2FA, phân quyền RBAC 2 tầng (system + project), Kanban board, Sprint planning, theo dõi thời gian, thông báo thời gian thực qua WebSocket, tích hợp AI để sinh kế hoạch dự án từ ngôn ngữ tự nhiên.
 
 Repository này chứa phần **Backend**. Phần **Frontend** (React + TypeScript) nằm ở repository riêng.
 
@@ -36,7 +36,7 @@ Repository này chứa phần **Backend**. Phần **Frontend** (React + TypeScri
 Browser (React – port 5173)
         │  HTTP/REST + WebSocket (STOMP/SockJS)
         ▼
-Spring Boot API (port 8080)
+Spring Boot API (port 8080)  ─── Gemini / OpenAI API
         │  Spring Data JPA (Hibernate)
         ▼
    PostgreSQL Database (port 5432)
@@ -50,69 +50,81 @@ Spring Boot API (port 8080)
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **JWT Authentication** | Access token 24h, Refresh token stateless, tự động cấp lại khi hết hạn |
+| **JWT Authentication** | Access token 24h, Refresh token 7 ngày, stateless |
 | **2FA (TOTP)** | Bật/tắt xác thực 2 bước, tương thích Google Authenticator |
-| **RBAC** | Phân quyền theo role dự án: `OWNER` / `MANAGER` / `DEVELOPER` / `VIEWER` |
-| **BCrypt** | Mã hóa mật khẩu, buộc đổi mật khẩu khi admin reset |
+| **System RBAC** | Phân quyền hệ thống: `Role` → `Permission`; flatten thành `GrantedAuthority` |
+| **Project-level RBAC** | Custom role per-project; permissions lưu CSV; `ProjectAuthorizationService` kiểm tra 2 tầng |
+| **BCrypt** | Mã hóa mật khẩu; admin có thể reset password |
 
 ### Quản lý dự án
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **Dự án** | CRUD dự án, phân quyền thành viên, tìm kiếm user để mời |
-| **Template** | 4 mẫu dự án có sẵn: Software, Marketing, Design, Event |
-| **Nhãn (Label)** | Tạo nhãn màu sắc, gán cho task để phân loại |
-| **Danh mục** | Quản lý issue categories theo từng dự án |
-| **Activity Feed** | Ghi nhật ký toàn bộ thay đổi trong dự án |
+| **Dự án** | CRUD dự án, field `key` (2–10 ký tự hoa), `projectType`, `projectConfig` JSON |
+| **Thành viên** | Mời/xóa thành viên; 2 role đặc biệt: `OWNER`, `PM`; tìm kiếm để @mention |
+| **Template** | 4 system template sẵn (Software/Marketing/Design/Event); tạo project từ template |
+| **Custom Roles** | Tạo role tùy chỉnh per-project với danh sách permission CSV |
+| **Nhãn (Label)** | Tạo nhãn màu sắc per-project, gán cho task |
+| **Danh mục** | `IssueCategory` per-project, có `defaultAssignee` |
+| **Activity Log** | Audit log bất đồng bộ (`@Async`) mọi thay đổi; `oldValue`/`newValue` JSONB |
+| **Performance** | Tính điểm năng lực thành viên: onTime, completion, timeAccuracy, engagement |
+| **Gantt Chart** | API cung cấp dữ liệu timeline |
 
 ### Task & Board
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **Bảng Kanban** | CRUD board và column, di chuyển task giữa cột, giới hạn WIP |
-| **Backlog** | Danh sách task chưa gán board; thêm vào Sprint theo yêu cầu |
-| **Sprint (Scrum)** | Tạo Sprint, giao task từ Backlog, bắt đầu / hoàn thành Sprint |
-| **Task chi tiết** | Assign, priority, deadline, estimate, checklist, attachment, time entry |
-| **Task liên kết** | Dependency: `BLOCKS` / `RELATES_TO`; phát hiện vòng tròn tự động |
-| **Gantt Chart** | API cung cấp dữ liệu timeline cho các version/milestone |
-| **Versions** | Quản lý phiên bản/milestone, theo dõi % hoàn thành |
+| **Bảng Kanban** | CRUD board/column; float position; WIP limit; `mappedStatus` |
+| **Backlog** | Task chưa gán sprint/column (`sprint=null, column=null`) |
+| **Sprint (Scrum)** | PLANNED→ACTIVE→COMPLETED/CANCELLED; chỉ 1 ACTIVE/project |
+| **Task hierarchy** | Self-ref tối đa 3 cấp qua `parentTask`; `getDepth()`, `canHaveChildren()` |
+| **Task detail** | Assign, priority, deadline, estimate, position (BigDecimal), taskKey |
+| **Task Dependencies** | BLOCKS / DEPENDS_ON / RELATES_TO / DUPLICATES / PRECEDES / FOLLOWS; phát hiện vòng tròn |
+| **Task Watchers** | Theo dõi/bỏ theo dõi task; kiểm tra trạng thái theo dõi |
+| **Kéo thả** | `PATCH /tasks/{id}/move` với `targetColumnId` + `newPosition` |
 
-### Bình luận & @Mention
+### Bình luận & Attachment
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **Bình luận** | CRUD bình luận, reply lồng nhau 1 cấp |
-| **@Mention** | Parse `@username` trong nội dung comment, tự động tạo notification |
-| **Tệp đính kèm** | Upload/download/xóa file tối đa 10 MB, lưu local tại `uploads/` |
+| **Comment** | CRUD; reply lồng nhau qua `parent` |
+| **@Mention** | Parse `@username` → tạo `CommentMention` → push notification |
+| **Attachment** | Upload/download/inline; max 10 MB/file, 15 MB/request; `FileCategory` enum |
+| **Storage** | Local (`uploads/`) hoặc AWS S3 theo env; `StorageService` interface |
 
 ### Theo dõi thời gian
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **Log giờ làm** | CRUD time entry theo task và ngày; tự cập nhật `actualHours` của task |
-| **Thống kê ngày** | `GET /time-entries/stats/daily` – chi tiết từng ngày |
-| **Thống kê tuần** | `GET /time-entries/stats/weekly` – tổng hợp theo tuần |
-| **Thống kê tháng** | `GET /time-entries/stats/monthly` – 12 tháng trong năm |
-| **Tổng hợp** | `GET /time-entries/stats/summary` – overview theo dự án & ngày |
-| **Thống kê dự án** | `GET /projects/{id}/time-entries/stats` – phân tích theo thành viên & task |
+| **Log giờ làm** | CRUD `TimeTracking`; `workDate`; tự cập nhật `actualHours` của task |
+| **Thống kê** | Daily / Weekly / Monthly / Summary; thống kê theo project |
 
 ### Thông báo & Realtime
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **WebSocket** | STOMP over SockJS; push notification và Kanban live update |
-| **Notification** | CRUD notification, đánh dấu đọc từng cái hoặc "Đọc tất cả" |
-| **Webhook** | Tích hợp Slack/Discord/hệ thống ngoài qua HTTP (OkHttp) |
+| **WebSocket** | STOMP over SockJS; endpoint `/ws`; broadcast `/topic/project/{id}` |
+| **Notification** | TASK_ASSIGNED / TASK_UPDATED / TASK_COMMENTED / MENTION / DUE_DATE_REMINDER / PROJECT_INVITE |
+| **Email** | Gmail SMTP qua Spring Mail + Thymeleaf template |
+| **Webhook** | Outbound HTTP (OkHttp); events CSV; có `successCount`/`failureCount` |
+
+### AI
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Sinh kế hoạch** | `POST /ai/projects/generate` — mô tả tự nhiên → preview kế hoạch (chưa lưu DB) |
+| **Xác nhận tạo** | `POST /ai/projects/confirm` — tạo thật Project + Tasks từ preview |
+| **Multi-provider** | `AiChatService` interface; impl: `GeminiChatService`, `OpenAiChatService`; chọn qua `AI_PROVIDER` env |
 
 ### Quản trị & Tiện ích
 
 | Tính năng | Mô tả |
 |-----------|-------|
 | **Admin** | Quản lý users, roles, permissions; kích hoạt/khóa tài khoản |
-| **Export Excel** | Xuất danh sách task của dự án ra file `.xlsx` (13 cột) |
-| **Dashboard** | Thống kê tổng quan cá nhân theo dự án |
+| **Export Excel** | Xuất danh sách task ra `.xlsx` (Apache POI) |
+| **Dashboard** | Thống kê tổng quan cá nhân và project |
 | **Search** | Tìm kiếm toàn cục tasks, projects, users |
-| **Swagger UI** | Tài liệu API tự động tại `/api/swagger-ui.html` |
+| **Swagger UI** | Tài liệu API tự động tại `/api/swagger-ui.html` (chỉ dev) |
 
 ---
 
@@ -120,25 +132,30 @@ Spring Boot API (port 8080)
 
 | Thư viện / Framework | Phiên bản | Mục đích |
 |----------------------|-----------|----------|
-| [Spring Boot](https://spring.io/projects/spring-boot) | 3.2.1 | Application framework |
-| [Spring Security](https://spring.io/projects/spring-security) | (theo Boot) | Authentication & Authorization |
-| [Spring Data JPA](https://spring.io/projects/spring-data-jpa) | (theo Boot) | ORM / Data Access Layer |
-| [Spring WebSocket](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#websocket) | (theo Boot) | Realtime STOMP/SockJS |
-| [PostgreSQL](https://www.postgresql.org) | 14+ | Cơ sở dữ liệu quan hệ |
-| [JJWT](https://github.com/jwtk/jjwt) | 0.12.3 | JWT implementation |
-| [Lombok](https://projectlombok.org) | (theo Boot) | Giảm boilerplate code |
-| [Springdoc OpenAPI](https://springdoc.org) | 2.3.0 | Swagger UI / API docs |
-| [Apache POI](https://poi.apache.org) | 5.2.5 | Export Excel (.xlsx) |
-| [totp-spring-boot-starter](https://github.com/samdjstevens/java-totp) | 1.7.1 | Two-Factor Authentication (TOTP) |
-| [OkHttp](https://square.github.io/okhttp) | 4.12.0 | Webhook HTTP client |
-| [Jakarta Bean Validation](https://beanvalidation.org) | (theo Boot) | Validate input request |
+| Spring Boot | 3.2.1 | Application framework |
+| Spring Security | (theo Boot) | Authentication & Authorization |
+| Spring Data JPA | (theo Boot) | ORM / Data Access Layer |
+| Spring WebSocket | (theo Boot) | Realtime STOMP/SockJS |
+| Spring Mail | (theo Boot) | Gửi email qua SMTP |
+| Spring Thymeleaf | (theo Boot) | Email template rendering |
+| PostgreSQL | 14+ | Cơ sở dữ liệu quan hệ |
+| H2 | (test scope) | In-memory DB cho unit test |
+| JJWT | 0.12.3 | JWT implementation |
+| Lombok | (theo Boot) | Giảm boilerplate code |
+| Springdoc OpenAPI | 2.3.0 | Swagger UI / API docs |
+| Apache POI | 5.2.5 | Export Excel (.xlsx) |
+| totp-spring-boot-starter | 1.7.1 | Two-Factor Authentication (TOTP) |
+| OkHttp | 4.12.0 | Webhook HTTP client |
+| AWS SDK S3 | 2.25.27 | File storage (production) |
+| Jackson Databind | (theo Boot) | JSON serialization |
+| Jakarta Bean Validation | (theo Boot) | Validate input request |
 
 ---
 
 ## Yêu cầu hệ thống
 
 - **Java** >= 17
-- **Maven** >= 3.8
+- **Maven** >= 3.8 (hoặc dùng `./mvnw` đi kèm)
 - **PostgreSQL** >= 14
 
 ---
@@ -154,36 +171,33 @@ cd taskoryx-be
 
 ### 2. Tạo database
 
-```bash
-# Kết nối PostgreSQL
-psql -U postgres
-
-# Tạo database và schema
-\i database-init.sql
-\c taskoryx_dev
-\i schema.sql
+```sql
+-- Kết nối PostgreSQL rồi chạy:
+CREATE DATABASE taskoryx;
 ```
 
 ### 3. Cấu hình ứng dụng
 
-Sửa file `src/main/resources/application.yaml`:
+Mở `src/main/resources/application.yaml`, kiểm tra:
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/taskoryx_dev
+    url: jdbc:postgresql://localhost:5432/taskoryx
     username: postgres
-    password: your_password
+    password: 123456
 ```
+
+Các thông tin nhạy cảm nên đặt qua biến môi trường (xem mục [Cấu hình ứng dụng](#cấu-hình-ứng-dụng)).
 
 ### 4. Chạy ứng dụng
 
 ```bash
-# Chạy trực tiếp với Maven Wrapper
+# Chạy trực tiếp (dev)
 ./mvnw spring-boot:run
 
 # Hoặc build JAR rồi chạy
-./mvnw clean package
+./mvnw clean package -DskipTests
 java -jar target/taskoryx-backend-1.0.0.jar
 ```
 
@@ -194,15 +208,12 @@ java -jar target/taskoryx-backend-1.0.0.jar
 curl http://localhost:8080/api/actuator/health
 
 # Swagger UI
-# Truy cập: http://localhost:8080/api/swagger-ui.html
+open http://localhost:8080/api/swagger-ui.html
 ```
 
-### Tài khoản mặc định
+### Tài khoản demo
 
-```
-Email:    admin@taskoryx.com
-Password: Admin@123
-```
+Ứng dụng seed dữ liệu mẫu khi khởi động lần đầu (`DemoDataInitializer`).
 
 ---
 
@@ -212,118 +223,156 @@ Password: Admin@123
 src/
 ├── main/
 │   ├── java/com/taskoryx/backend/
-│   │   ├── TaskoryxApplication.java   # Entry point
+│   │   ├── TaskoryxApplication.java        # Entry point (@EnableAsync)
 │   │   │
-│   │   ├── config/                    # Cấu hình Spring (Security, WebSocket, CORS, Swagger)
-│   │   ├── security/                  # JWT filter, UserDetailsService, token provider
-│   │   ├── entity/                    # JPA Entities (ánh xạ bảng database)
-│   │   ├── repository/                # Spring Data JPA repositories
-│   │   ├── dto/                       # Request / Response DTOs
-│   │   ├── service/                   # Business logic
-│   │   ├── controller/                # REST Controllers (@RestController)
-│   │   └── exception/                 # Global exception handler (@ControllerAdvice)
+│   │   ├── ai/                             # Module tích hợp LLM
+│   │   │   ├── controller/                 # AiProjectPlanController
+│   │   │   ├── dto/                        # Request/Response cho AI
+│   │   │   ├── parser/                     # AiResponseParser (parse JSON từ LLM)
+│   │   │   ├── prompt/                     # ProjectPlanPrompt (template prompt)
+│   │   │   ├── service/                    # AiChatService (interface)
+│   │   │   │   └── impl/                   # GeminiChatService, OpenAiChatService
+│   │   │   └── skill/                      # AiPlanExecutor (thực thi kế hoạch)
+│   │   │
+│   │   ├── config/                         # SecurityConfig, WebSocketConfig,
+│   │   │                                   # OpenApiConfig, ValidationConfig
+│   │   ├── security/                       # JwtTokenProvider, JwtAuthFilter,
+│   │   │                                   # UserPrincipal, CustomUserDetailsService
+│   │   ├── entity/                         # JPA Entities (UUID PKs)
+│   │   ├── repository/                     # Spring Data JPA repositories
+│   │   ├── dto/
+│   │   │   ├── request/                    # Request bodies (sub-packages theo feature)
+│   │   │   └── response/                   # Response DTOs (sub-packages theo feature)
+│   │   ├── service/                        # Business logic
+│   │   ├── controller/                     # REST Controllers
+│   │   └── exception/                      # Custom exceptions + GlobalExceptionHandler
 │   │
 │   └── resources/
-│       ├── application.yaml           # Cấu hình chung
-│       ├── application-dev.yaml       # Cấu hình môi trường development
-│       └── application-prod.yaml      # Cấu hình môi trường production
+│       ├── application.yaml                # Cấu hình dev
+│       ├── application-dev.yaml            # Override dev
+│       ├── application-prod.yaml           # Production (S3, no Swagger, env vars)
+│       └── ValidationMessages.properties  # Validation messages tiếng Việt (UTF-8)
 │
-└── test/                              # Unit & integration tests
+└── test/                                   # Unit & integration tests (H2)
 
-database-init.sql                      # Khởi tạo database
-schema.sql                             # Tạo toàn bộ bảng
-uploads/                               # Thư mục lưu file đính kèm
-pom.xml                                # Maven dependencies
+uploads/                                    # Thư mục lưu file đính kèm (local)
+pom.xml                                     # Maven dependencies
 ```
 
 ---
 
 ## Cấu hình ứng dụng
 
-Các thuộc tính quan trọng trong `application.yaml`:
+### Biến môi trường quan trọng (production)
+
+| Biến | Mô tả |
+|------|-------|
+| `AI_PROVIDER` | Provider LLM: `gemini` (mặc định) hoặc `openai` |
+| `GEMINI_API_KEY` | API key cho Gemini |
+| `OPENAI_API_KEY` | API key cho OpenAI |
+| `S3_BUCKET` | Tên S3 bucket (production) |
+| `S3_REGION` | AWS region |
+| `S3_ACCESS_KEY` | AWS access key |
+| `S3_SECRET_KEY` | AWS secret key |
+
+### Các thuộc tính chính trong `application.yaml`
 
 | Thuộc tính | Mặc định | Mô tả |
 |------------|----------|-------|
-| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/taskoryx_dev` | JDBC URL kết nối PostgreSQL |
-| `spring.datasource.username` | `postgres` | Username database |
-| `spring.datasource.password` | _(bắt buộc đặt)_ | Password database |
-| `app.jwt.secret` | _(bắt buộc đặt)_ | Secret key ký JWT (>= 256 bit) |
-| `app.jwt.expiration` | `86400000` | Thời hạn access token (ms) – mặc định 24h |
-| `app.jwt.refresh-expiration` | `604800000` | Thời hạn refresh token (ms) – mặc định 7 ngày |
-| `app.upload.dir` | `uploads/` | Thư mục lưu file đính kèm |
-| `server.servlet.context-path` | `/api` | Context path của toàn bộ API |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/taskoryx` | JDBC URL |
+| `spring.datasource.username` | `postgres` | Username DB |
+| `spring.datasource.password` | `123456` | Password DB |
+| `jwt.secret` | _(đặt qua env)_ | Secret key ký JWT (>= 256 bit) |
+| `jwt.expiration` | `86400000` | Access token TTL (ms) – 24h |
+| `jwt.refresh-expiration` | `604800000` | Refresh token TTL (ms) – 7 ngày |
+| `app.upload-dir` | `uploads` | Thư mục lưu file local |
+| `server.servlet.context-path` | `/api` | Context path toàn bộ API |
+| `spring.jpa.hibernate.ddl-auto` | `update` | Schema tự cập nhật theo entity |
+| `spring.jpa.open-in-view` | `false` | Tắt OSIV để tránh lazy load ngoài transaction |
 
 ---
 
 ## Kiến trúc hệ thống
 
 ```
-┌──────────────────────────────────────────┐
-│           REST CONTROLLERS               │
-│  AuthController · ProjectController      │
-│  TaskController · BoardController ...    │
-├──────────────────────────────────────────┤
-│             SERVICE LAYER                │
-│  Business logic, validation, mapping     │
-│  ProjectService · TaskService ...        │
-├──────────────────────────────────────────┤
-│           REPOSITORY LAYER               │
-│  Spring Data JPA repositories            │
-│  Custom JPQL / native queries            │
-├──────────────────────────────────────────┤
-│              JPA ENTITIES                │
-│  User · Project · Task · Board ...       │
-├──────────────────────────────────────────┤
-│            POSTGRESQL DATABASE           │
-│         jdbc:postgresql://localhost:5432 │
-└──────────────────────────────────────────┘
-         ▲                    ▲
-         │ JWT Filter         │ STOMP/SockJS
-   Spring Security      WebSocket Broker
+┌──────────────────────────────────────────────────┐
+│                REST CONTROLLERS                  │
+│  AuthController · ProjectController              │
+│  TaskController · BoardController · ...          │
+│  AiProjectPlanController                         │
+├──────────────────────────────────────────────────┤
+│               SERVICE LAYER                      │
+│  Business logic, permission check, DTO mapping   │
+│  ProjectService · TaskService · SprintService    │
+│  ActivityLogService (@Async) · EmailService      │
+│  NotificationService · WebhookService            │
+│  ProjectAuthorizationService (2-layer check)     │
+├──────────────────────────────────────────────────┤
+│            REPOSITORY LAYER                      │
+│  Spring Data JPA + custom JPQL/native queries    │
+├──────────────────────────────────────────────────┤
+│               JPA ENTITIES                       │
+│  User · Project · Task · Board · Sprint          │
+│  ActivityLog · Notification · Webhook · ...      │
+├──────────────────────────────────────────────────┤
+│           POSTGRESQL DATABASE                    │
+│      jdbc:postgresql://localhost:5432/taskoryx   │
+└──────────────────────────────────────────────────┘
+         ▲                      ▲
+         │ JwtAuthFilter         │ STOMP/SockJS
+   Spring Security         WebSocket Broker
 ```
 
 **Nguyên tắc thiết kế:**
 
-- **Layered Architecture** – Controller → Service → Repository, mỗi tầng chỉ phụ thuộc tầng dưới
-- **DTO Pattern** – Không expose entity trực tiếp ra ngoài; dùng Request/Response DTO riêng biệt
-- **Stateless Auth** – JWT stateless, không lưu session phía server
-- **Global Exception Handling** – `@ControllerAdvice` bắt toàn bộ exception, trả về lỗi chuẩn
-- **Soft constraints** – Kiểm tra quyền ở tầng Service, không chỉ dựa vào annotation
+- **Layered Architecture** – Controller → Service → Repository; controller không chứa business logic
+- **DTO bắt buộc** – Không expose entity thô ra API; dùng `ApiResponse<T>` / `PagedResponse<T>` cho mọi response
+- **Stateless Auth** – JWT stateless; không lưu session phía server
+- **Global Exception Handling** – `GlobalExceptionHandler` bắt `ResourceNotFoundException` (404), `ForbiddenException` (403), `BadRequestException` (400)
+- **Async side-effects** – `ActivityLogService`, `NotificationService`, `EmailService`, `WebhookService` chạy `@Async`; phải load entity đầy đủ trước khi truyền sang async thread
+- **Permission model 2 tầng** – System-level qua `GrantedAuthority` + `@PreAuthorize`; Project-level qua `ProjectAuthorizationService.requirePermission()`
 
 ---
 
 ## Tài liệu API
 
-Swagger UI tự động sinh từ annotation, truy cập sau khi chạy ứng dụng:
+Swagger UI tự động sinh từ annotation, truy cập sau khi chạy ứng dụng (chỉ môi trường dev):
 
 ```
 http://localhost:8080/api/swagger-ui.html
 ```
 
+Hướng dẫn tích hợp cho Frontend: [`docs/frontend-api-guide.md`](./docs/frontend-api-guide.md)
+
 ### Các nhóm endpoint chính
 
 | Nhóm | Prefix | Mô tả |
 |------|--------|-------|
-| Auth | `/auth` | Đăng nhập, đăng ký, refresh token, logout, 2FA |
-| User | `/users` | Profile, đổi mật khẩu, tìm kiếm user |
-| Project | `/projects` | CRUD dự án, thành viên, labels, thống kê giờ |
+| Auth | `/auth` | Đăng nhập, refresh token, logout |
+| 2FA | `/auth/2fa` | Setup, enable, disable, status |
+| User | `/users` | Profile, đổi mật khẩu, avatar, tìm kiếm, performance |
+| Project | `/projects` | CRUD dự án, thành viên, roles, activity, gantt, performance |
 | Board | `/boards`, `/columns` | Kanban board, quản lý cột, di chuyển cột |
-| Task | `/tasks`, `/projects/{id}/tasks` | CRUD task, kéo thả, lọc, tìm kiếm |
+| Task | `/tasks`, `/projects/{id}/tasks` | CRUD task, kéo thả, filter, tìm kiếm, valid-parents |
+| Sprint | `/projects/{id}/sprints`, `/sprints` | CRUD sprint, bắt đầu, hoàn thành |
 | Comment | `/tasks/{id}/comments`, `/comments` | Bình luận, reply, @mention |
-| Attachment | `/tasks/{id}/attachments`, `/attachments` | Upload/download/xóa file |
-| Checklist | `/tasks/{id}/checklist` | CRUD checklist items |
-| Dependency | `/tasks/{id}/dependencies` | Liên kết BLOCKS / RELATES_TO |
-| Watcher | `/tasks/{id}/watchers` | Theo dõi / bỏ theo dõi task |
-| Time Entry | `/time-entries`, `/tasks/{id}/time-entries` | Log giờ, sửa, xóa, thống kê |
-| Sprint | `/projects/{id}/sprints` | CRUD sprint, bắt đầu, hoàn thành |
-| Version | `/projects/{id}/versions`, `/gantt` | Milestone, Gantt chart |
-| Category | `/projects/{id}/categories` | Danh mục issue |
-| Activity | `/projects/{id}/activity` | Nhật ký hoạt động |
+| Attachment | `/tasks/{id}/attachments`, `/attachments` | Upload/download/inline/xóa file |
+| Label | `/projects/{id}/labels`, `/labels` | Nhãn per-project |
+| Category | `/projects/{id}/categories`, `/categories` | Issue category |
+| Dependency | `/tasks/{id}/dependencies` | Liên kết task |
+| Watcher | `/tasks/{id}/watchers` | Theo dõi task |
+| Time Entry | `/time-entries`, `/tasks/{id}/time-entries` | Log giờ, thống kê |
+| Activity | `/projects/{id}/activity`, `/tasks/{id}/activity` | Nhật ký hoạt động |
 | Notification | `/notifications` | Danh sách, đánh dấu đọc, đếm chưa đọc |
-| Dashboard | `/dashboard/me` | Thống kê tổng quan cá nhân |
-| Template | `/templates/public` | Template dự án công khai |
+| Dashboard | `/dashboard` | Thống kê cá nhân và project |
+| Performance | `/projects/{id}/performance` | Điểm năng lực thành viên |
+| Template | `/templates` | CRUD template; tạo project từ template |
+| Project Roles | `/project-roles` | Cập nhật/xóa custom role |
+| Webhook | `/projects/{id}/webhooks`, `/webhooks` | CRUD webhook, test ping |
 | Search | `/search` | Tìm kiếm toàn cục |
-| Admin | `/admin/*` | Quản trị users, roles, permissions |
+| Export | `/export` | Xuất task ra Excel |
+| AI | `/ai/projects` | Sinh kế hoạch từ ngôn ngữ tự nhiên |
+| Admin | `/admin` | Quản trị users, roles, permissions `[ADMIN_ACCESS]` |
 
 ---
 

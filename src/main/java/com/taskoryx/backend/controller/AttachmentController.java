@@ -4,6 +4,7 @@ import com.taskoryx.backend.dto.response.ApiResponse;
 import com.taskoryx.backend.dto.response.PagedResponse;
 import com.taskoryx.backend.dto.response.attachment.AttachmentResponse;
 import com.taskoryx.backend.dto.response.attachment.AttachmentStatsResponse;
+import com.taskoryx.backend.dto.response.attachment.InlineUploadResponse;
 import com.taskoryx.backend.entity.FileCategory;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.security.UserPrincipal;
@@ -69,6 +70,17 @@ public class AttachmentController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Upload file thành công",
                         attachmentService.uploadAttachment(taskId, file, commentId, principal)));
+    }
+
+    @PostMapping(value = "/tasks/{taskId}/attachments/inline", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload file nhúng vào comment (ảnh paste/drag-drop). Trả về URL public dùng được trong <img src>. File không hiện trong tab đính kèm.")
+    public ResponseEntity<ApiResponse<InlineUploadResponse>> uploadInlineAttachment(
+            @PathVariable UUID taskId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Upload file thành công",
+                        attachmentService.uploadInlineAttachment(taskId, file, principal)));
     }
 
     @GetMapping("/comments/{commentId}/attachments")

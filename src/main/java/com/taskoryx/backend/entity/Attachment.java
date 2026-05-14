@@ -60,6 +60,11 @@ public class Attachment {
     @Column(name = "storage_path", nullable = false, length = 500)
     private String storagePath;
 
+    /** true = file nhúng trong nội dung comment (ảnh paste/drag), không hiện trong tab "Tệp đính kèm" */
+    @Column(name = "is_inline", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean isInline = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

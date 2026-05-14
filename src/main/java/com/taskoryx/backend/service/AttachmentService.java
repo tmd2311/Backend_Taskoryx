@@ -3,6 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.config.AppProperties;
 import com.taskoryx.backend.dto.response.attachment.AttachmentResponse;
 import com.taskoryx.backend.dto.response.attachment.AttachmentStatsResponse;
+import com.taskoryx.backend.dto.response.attachment.InlineUploadResponse;
 import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.entity.Attachment;
 import com.taskoryx.backend.entity.Comment;
@@ -88,7 +89,7 @@ public class AttachmentService {
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_VIEW);
 
-        List<Attachment> attachments = attachmentRepository.findByTaskIdOrderByCreatedAtDesc(taskId);
+        List<Attachment> attachments = attachmentRepository.findByTaskIdAndIsInlineFalseOrderByCreatedAtDesc(taskId);
         return attachments.stream()
                 .filter(a -> category == null || a.getFileCategory() == category)
                 .map(AttachmentResponse::from)
@@ -262,6 +263,50 @@ public class AttachmentService {
                 null, "{\"fileName\":\"" + attachment.getFileName() + "\",\"taskId\":\"" + task.getId() + "\"}");
 
         return response;
+    }
+
+    /**
+     * Upload file nhúng vào nội dung comment (ảnh paste/drag-drop).
+     * File được lưu DB với isInline=true → không hiện trong tab "Tệp đính kèm".
+     * URL trả về dạng /api/files/... (public, không cần auth header).
+     */
+    @Transactional
+    public InlineUploadResponse uploadInlineAttachment(UUID taskId, MultipartFile file,
+                                                       UserPrincipal principal) throws IOException {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
+        projectCapabilityService.requireModule(task.getProject(), ProjectCapabilityService.MODULE_ATTACHMENT);
+        projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
+                ProjectPermission.ATTACHMENT_MANAGE);
+
+        if (file.isEmpty()) {
+            throw new BadRequestException("File không được để trống");
+        }
+        if (file.getSize() > appProperties.getStorage().getMaxFileSize()) {
+            throw new BadRequestException("File quá lớn. Kích thước tối đa là 10MB");
+        }
+        if (!isAllowedFileType(file)) {
+            throw new BadRequestException("Loại file không được hỗ trợ: " + file.getOriginalFilename());
+        }
+
+        User uploader = userRepository.findById(principal.getId()).orElseThrow();
+
+        String relativePath = "tasks/" + taskId + "/inline/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
+        String fileUrl = storageService.store(file, relativePath);
+
+        Attachment attachment = Attachment.builder()
+                .task(task)
+                .uploadedBy(uploader)
+                .fileName(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .fileType(file.getContentType())
+                .fileUrl(fileUrl)
+                .storagePath(relativePath)
+                .isInline(true)
+                .build();
+
+        attachment = attachmentRepository.save(attachment);
+        return new InlineUploadResponse(fileUrl, attachment.getId());
     }
 
     /**

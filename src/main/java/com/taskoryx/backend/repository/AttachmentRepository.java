@@ -15,6 +15,9 @@ public interface AttachmentRepository extends JpaRepository<Attachment, UUID> {
 
     List<Attachment> findByTaskIdOrderByCreatedAtDesc(UUID taskId);
 
+    /** Chỉ file thường (không phải inline) của một task — dùng cho tab "Tệp đính kèm" */
+    List<Attachment> findByTaskIdAndIsInlineFalseOrderByCreatedAtDesc(UUID taskId);
+
     /** File đính kèm của một comment cụ thể */
     List<Attachment> findByCommentIdOrderByCreatedAtAsc(UUID commentId);
 

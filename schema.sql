@@ -360,17 +360,20 @@ CREATE TABLE comment_mentions (
 CREATE TABLE attachments (
     id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id      UUID         NOT NULL,
+    comment_id   UUID,
     uploaded_by  UUID         NOT NULL,
     file_name    VARCHAR(255) NOT NULL,
     file_size    BIGINT       NOT NULL,
     file_type    VARCHAR(100) NOT NULL,
     file_url     VARCHAR(500) NOT NULL,
     storage_path VARCHAR(500) NOT NULL,
+    is_inline    BOOLEAN      NOT NULL DEFAULT false,
     created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_attachments_task FOREIGN KEY (task_id)     REFERENCES tasks(id) ON DELETE CASCADE,
-    CONSTRAINT fk_attachments_user FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT chk_attachments_size CHECK (file_size > 0 AND file_size <= 10485760)
+    CONSTRAINT fk_attachments_task    FOREIGN KEY (task_id)    REFERENCES tasks(id)    ON DELETE CASCADE,
+    CONSTRAINT fk_attachments_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE SET NULL,
+    CONSTRAINT fk_attachments_user    FOREIGN KEY (uploaded_by) REFERENCES users(id)   ON DELETE CASCADE,
+    CONSTRAINT chk_attachments_size   CHECK (file_size > 0 AND file_size <= 10485760)
 );
 
 COMMENT ON COLUMN attachments.storage_path IS 'Đường dẫn vật lý trên server (uploads/)';
