@@ -238,7 +238,10 @@ public class PerformanceService {
     }
 
     /**
-     * Build engagement map: userId → commentCount + activityLogCount trong project.
+     * Build engagement map: userId → weighted score.
+     * - Comment: +1 mỗi comment
+     * - ActivityLog thường (UPDATE, MOVE, ASSIGN...): +1
+     * - ActivityLog COMPLETE (hoàn thành task): +2 (trọng số cao hơn)
      */
     private Map<UUID, Long> buildEngagementMap(UUID projectId) {
         Map<UUID, Long> map = new HashMap<>();
@@ -249,6 +252,12 @@ public class PerformanceService {
             map.merge(uid, count, Long::sum);
         }
         for (Object[] row : activityLogRepository.countPerUserByProjectId(projectId)) {
+            UUID uid = (UUID) row[0];
+            Long count = (Long) row[1];
+            map.merge(uid, count, Long::sum);
+        }
+        // Hoàn thành task tính thêm 1 điểm nữa (tổng cộng +2 so với log thường)
+        for (Object[] row : activityLogRepository.countCompletionsByUserInProject(projectId)) {
             UUID uid = (UUID) row[0];
             Long count = (Long) row[1];
             map.merge(uid, count, Long::sum);

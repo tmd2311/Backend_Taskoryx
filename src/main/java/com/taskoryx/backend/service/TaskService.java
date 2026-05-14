@@ -201,14 +201,17 @@ public class TaskService {
         if (request.getEstimatedHours() != null) task.setEstimatedHours(request.getEstimatedHours());
         if (request.getActualHours() != null) task.setActualHours(request.getActualHours());
 
+        boolean assigneeChanged = false;
+        User newAssigneeUser = null;
+        UUID oldAssigneeId = task.getAssignee() != null ? task.getAssignee().getId() : null;
+
         if (request.getAssigneeId() != null) {
-            User assignee = findMemberUserInProject(task.getProject().getId(), request.getAssigneeId(), "assignee");
-            boolean newAssignee = task.getAssignee() == null ||
-                    !task.getAssignee().getId().equals(request.getAssigneeId());
-            task.setAssignee(assignee);
-            if (newAssignee && !assignee.getId().equals(principal.getId())) {
+            newAssigneeUser = findMemberUserInProject(task.getProject().getId(), request.getAssigneeId(), "assignee");
+            assigneeChanged = oldAssigneeId == null || !oldAssigneeId.equals(request.getAssigneeId());
+            task.setAssignee(newAssigneeUser);
+            if (assigneeChanged && !newAssigneeUser.getId().equals(principal.getId())) {
                 notificationService.notifyTaskAssigned(
-                        assignee.getId(), task.getReporter().getFullName(),
+                        newAssigneeUser.getId(), task.getReporter().getFullName(),
                         task.getId(), task.getTitle(), task.getProject().getName());
             }
         }
@@ -272,6 +275,15 @@ public class TaskService {
                 "Task '" + saved.getTitle() + "' đã được cập nhật");
 
         User actor = userRepository.findById(principal.getId()).orElseThrow();
+
+        // Log ASSIGN riêng nếu assignee thay đổi — quan trọng cho performance scoring
+        if (assigneeChanged && newAssigneeUser != null) {
+            String oldVal = oldAssigneeId != null ? "{\"assigneeId\":\"" + oldAssigneeId + "\"}" : null;
+            activityLogService.logActivity(actor, saved.getProject(),
+                    ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.ASSIGN,
+                    oldVal, "{\"assigneeId\":\"" + newAssigneeUser.getId() + "\",\"assigneeName\":\"" + newAssigneeUser.getFullName() + "\"}");
+        }
+
         activityLogService.logActivity(actor, saved.getProject(),
                 ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.UPDATE,
                 null, "{\"taskKey\":\"" + saved.getTaskKey() + "\",\"title\":\"" + saved.getTitle() + "\"}");
@@ -369,8 +381,11 @@ public class TaskService {
         Task saved = taskRepository.save(task);
 
         User actor = userRepository.findById(principal.getId()).orElseThrow();
+        boolean isCompleted = saved.getStatus() == Task.TaskStatus.DONE
+                || saved.getStatus() == Task.TaskStatus.RESOLVED;
+        ActivityLog.Action logAction = isCompleted ? ActivityLog.Action.COMPLETE : ActivityLog.Action.UPDATE;
         activityLogService.logActivity(actor, saved.getProject(),
-                ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.UPDATE,
+                ActivityLog.EntityType.TASK, saved.getId(), logAction,
                 "{\"status\":\"" + oldStatus + "\"}",
                 "{\"status\":\"" + saved.getStatus().name() + "\"}");
 

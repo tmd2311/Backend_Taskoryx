@@ -54,6 +54,7 @@ public class ActivityLogService {
     }
 
     @Async
+    @Transactional
     public void logActivity(User user, Project project, ActivityLog.EntityType entityType,
                              UUID entityId, ActivityLog.Action action,
                              String oldValue, String newValue) {

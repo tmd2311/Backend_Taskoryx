@@ -26,4 +26,8 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, UUID> 
 
     @Query("SELECT a.user.id, COUNT(a) FROM ActivityLog a WHERE a.project.id = :projectId GROUP BY a.user.id")
     List<Object[]> countPerUserByProjectId(@Param("projectId") UUID projectId);
+
+    /** Đếm số lần hoàn thành task (action = COMPLETE) theo user trong project — dùng cho performance scoring */
+    @Query("SELECT a.user.id, COUNT(a) FROM ActivityLog a WHERE a.project.id = :projectId AND a.action = 'COMPLETE' AND a.entityType = 'TASK' GROUP BY a.user.id")
+    List<Object[]> countCompletionsByUserInProject(@Param("projectId") UUID projectId);
 }
