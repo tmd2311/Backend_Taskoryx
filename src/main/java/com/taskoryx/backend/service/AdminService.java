@@ -13,6 +13,7 @@ import com.taskoryx.backend.exception.ForbiddenException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.*;
 import com.taskoryx.backend.security.UserPrincipal;
+import com.taskoryx.backend.util.RoleNameGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -66,12 +67,14 @@ public class AdminService {
 
     @Transactional
     public RoleResponse createRole(CreateRoleRequest request) {
-        if (roleRepository.existsByName(request.getName())) {
-            throw new BadRequestException("Role '" + request.getName() + "' đã tồn tại");
+        String generatedName = RoleNameGenerator.generate(request.getDisplayName());
+        if (roleRepository.existsByName(generatedName)) {
+            throw new BadRequestException("Vai trò '" + request.getDisplayName() + "' đã tồn tại");
         }
 
         Role role = Role.builder()
-                .name(request.getName().toUpperCase().replace(" ", "_"))
+                .name(generatedName)
+                .displayName(request.getDisplayName())
                 .description(request.getDescription())
                 .isSystemRole(false)
                 .build();
@@ -96,11 +99,13 @@ public class AdminService {
             throw new ForbiddenException("Không thể sửa system role");
         }
 
-        if (request.getName() != null && !request.getName().equals(role.getName())) {
-            if (roleRepository.existsByName(request.getName())) {
-                throw new BadRequestException("Role '" + request.getName() + "' đã tồn tại");
+        if (request.getDisplayName() != null && !request.getDisplayName().equals(role.getDisplayName())) {
+            String generatedName = RoleNameGenerator.generate(request.getDisplayName());
+            if (roleRepository.existsByName(generatedName) && !generatedName.equals(role.getName())) {
+                throw new BadRequestException("Vai trò '" + request.getDisplayName() + "' đã tồn tại");
             }
-            role.setName(request.getName().toUpperCase().replace(" ", "_"));
+            role.setDisplayName(request.getDisplayName());
+            role.setName(generatedName);
         }
 
         if (request.getDescription() != null) {

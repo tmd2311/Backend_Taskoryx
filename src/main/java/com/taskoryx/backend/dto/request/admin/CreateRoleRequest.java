@@ -10,9 +10,9 @@ import java.util.UUID;
 @Data
 public class CreateRoleRequest {
 
-    @NotBlank(message = "Tên role không được để trống")
-    @Size(max = 100)
-    private String name;
+    @NotBlank(message = "Tên hiển thị không được để trống")
+    @Size(max = 100, message = "Tên hiển thị không được vượt quá 100 ký tự")
+    private String displayName;
 
     @Size(max = 255)
     private String description;

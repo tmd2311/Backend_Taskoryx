@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 public class RoleResponse {
     private UUID id;
     private String name;
+    private String displayName;
     private String description;
     private Boolean isSystemRole;
     private Set<PermissionResponse> permissions;
@@ -23,6 +24,7 @@ public class RoleResponse {
         return RoleResponse.builder()
                 .id(role.getId())
                 .name(role.getName())
+                .displayName(role.getDisplayName())
                 .description(role.getDescription())
                 .isSystemRole(role.getIsSystemRole())
                 .permissions(role.getPermissions().stream()

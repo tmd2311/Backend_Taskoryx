@@ -32,6 +32,9 @@ public class Role {
     @Column(unique = true, nullable = false, length = 100)
     private String name;
 
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+
     @Column(length = 255)
     private String description;
 

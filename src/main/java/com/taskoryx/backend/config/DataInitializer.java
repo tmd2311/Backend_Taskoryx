@@ -279,11 +279,11 @@ public class DataInitializer implements ApplicationRunner {
                 permission.setDisplayName(def.displayName());
                 dirty = true;
             }
-            if (!def.description().equals(permission.getDescription())) {
+            if (permission.getDescription() == null || !def.description().equals(permission.getDescription())) {
                 permission.setDescription(def.description());
                 dirty = true;
             }
-            if (!def.resource().equals(permission.getResource())) {
+            if (permission.getResource() == null || !def.resource().equals(permission.getResource())) {
                 permission.setResource(def.resource());
                 dirty = true;
             }
@@ -302,32 +302,32 @@ public class DataInitializer implements ApplicationRunner {
     // ── Role init ────────────────────────────────────────────────────────────
 
     private void initRoles(Map<String, Permission> permissions) {
-        upsertSystemRole("SUPER_ADMIN",
-                "Quản trị viên cấp cao — toàn quyền hệ thống bao gồm quản lý template",
+        upsertSystemRole("SUPER_ADMIN", "Quản trị viên cấp cao",
+                "Toàn quyền hệ thống, bao gồm quản lý template và tài khoản",
                 SUPER_ADMIN_PERMISSIONS, permissions);
 
-        upsertSystemRole("ADMIN",
-                "Quản trị viên — quản lý thông tin người dùng (thêm, sửa, xóa tài khoản)",
+        upsertSystemRole("ADMIN", "Quản trị viên",
+                "Quản lý tài khoản người dùng, gán vai trò và truy cập trang quản trị",
                 ADMIN_PERMISSIONS, permissions);
 
-        upsertSystemRole("PROJECT_MANAGER",
-                "Quản lý dự án — toàn quyền dự án, thêm/xóa thành viên, quản lý sprint",
+        upsertSystemRole("PROJECT_MANAGER", "Quản lý dự án",
+                "Toàn quyền trong dự án: thành viên, sprint, board và báo cáo",
                 PROJECT_MANAGER_PERMISSIONS, permissions);
 
-        upsertSystemRole("TEAM_LEAD",
-                "Trưởng nhóm — quản lý công việc và sprint, xem báo cáo trong dự án",
+        upsertSystemRole("TEAM_LEAD", "Trưởng nhóm",
+                "Quản lý công việc và sprint, xem báo cáo, không quản lý thành viên",
                 TEAM_LEAD_PERMISSIONS, permissions);
 
-        upsertSystemRole("MEMBER",
-                "Thành viên — xem và thực hiện công việc được giao trong dự án",
+        upsertSystemRole("MEMBER", "Thành viên",
+                "Xem và thực hiện công việc được giao trong dự án",
                 MEMBER_PERMISSIONS, permissions);
     }
 
     /**
-     * Tạo role nếu chưa tồn tại; nếu đã có thì chỉ cập nhật description và permissions.
+     * Tạo role nếu chưa tồn tại; nếu đã có thì đồng bộ displayName, description và permissions.
      * Luôn đặt isSystemRole = true (bảo vệ khỏi xóa qua API).
      */
-    private void upsertSystemRole(String name, String description,
+    private void upsertSystemRole(String name, String displayName, String description,
                                    List<String> permissionNames,
                                    Map<String, Permission> allPermissions) {
         Set<Permission> perms = permissionNames.stream()
@@ -338,6 +338,7 @@ public class DataInitializer implements ApplicationRunner {
         Role role = roleRepository.findByName(name).orElseGet(() ->
                 Role.builder().name(name).build());
 
+        role.setDisplayName(displayName);
         role.setDescription(description);
         role.setIsSystemRole(true);
         role.setPermissions(perms);
