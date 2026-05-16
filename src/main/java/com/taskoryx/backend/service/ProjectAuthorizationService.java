@@ -44,7 +44,7 @@ public class ProjectAuthorizationService {
     public Project requireProjectAdmin(UUID projectId, UUID userId) {
         Project project = findProject(projectId);
         if (!hasProjectAdmin(project, userId)) {
-            throw new ForbiddenException("Bạn cần quyền PROJECT_MANAGER, SUPER_ADMIN hoặc OWNER để thực hiện thao tác này");
+            throw new ForbiddenException("Bạn không có quyền quản trị dự án này");
         }
         return project;
     }
@@ -52,7 +52,7 @@ public class ProjectAuthorizationService {
     public void requirePermission(UUID projectId, UUID userId, String permission) {
         Project project = findProject(projectId);
         if (!hasPermission(project, userId, permission)) {
-            throw new ForbiddenException("Bạn không có quyền " + permission + " trong dự án này");
+            throw new ForbiddenException("Bạn không có quyền thực hiện thao tác này trong dự án");
         }
     }
 

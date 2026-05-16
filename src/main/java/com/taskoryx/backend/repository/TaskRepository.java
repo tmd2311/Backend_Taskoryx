@@ -97,6 +97,46 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
 
     List<Task> findByParentTaskId(UUID parentTaskId);
 
+    // ── Project Stats queries ────────────────────────────────────────────────
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.project.id = :projectId AND t.priority = :priority")
+    long countByProjectIdAndPriority(@Param("projectId") UUID projectId,
+                                     @Param("priority") Task.TaskPriority priority);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.project.id = :projectId AND t.assignee IS NULL")
+    long countUnassignedByProjectId(@Param("projectId") UUID projectId);
+
+    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.dueDate < :today AND t.completedAt IS NULL ORDER BY t.dueDate ASC")
+    List<Task> findOverdueByProjectId(@Param("projectId") UUID projectId,
+                                      @Param("today") LocalDate today);
+
+    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.dueDate BETWEEN :from AND :to AND t.completedAt IS NULL ORDER BY t.dueDate ASC")
+    List<Task> findUpcomingByProjectId(@Param("projectId") UUID projectId,
+                                       @Param("from") LocalDate from,
+                                       @Param("to") LocalDate to);
+
+    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.completedAt >= :from AND t.completedAt < :to")
+    List<Task> findCompletedBetween(@Param("projectId") UUID projectId,
+                                    @Param("from") LocalDateTime from,
+                                    @Param("to") LocalDateTime to);
+
+    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.createdAt >= :from AND t.createdAt < :to")
+    List<Task> findCreatedBetween(@Param("projectId") UUID projectId,
+                                  @Param("from") LocalDateTime from,
+                                  @Param("to") LocalDateTime to);
+
+    @Query("SELECT t FROM Task t WHERE t.project.id = :projectId AND t.assignee IS NOT NULL")
+    List<Task> findAllWithAssigneeByProjectId(@Param("projectId") UUID projectId);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.sprint.id = :sprintId AND t.status IN ('DONE', 'RESOLVED', 'CANCELLED')")
+    long countDoneBySprintId(@Param("sprintId") UUID sprintId);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.sprint.id = :sprintId AND t.status = 'IN_PROGRESS'")
+    long countInProgressBySprintId(@Param("sprintId") UUID sprintId);
+
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.sprint.id = :sprintId AND t.status = 'TODO'")
+    long countTodoBySprintId(@Param("sprintId") UUID sprintId);
+
     // Tasks thuộc project, không phải cấp 3 (parentTask.parentTask IS NULL → cấp 1 hoặc cấp 2)
     @Query(value = "SELECT t.* FROM tasks t " +
                    "LEFT JOIN tasks p ON t.parent_id = p.id " +

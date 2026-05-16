@@ -88,6 +88,9 @@ public class User {
     @Column(name = "two_factor_secret", length = 100)
     private String twoFactorSecret;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

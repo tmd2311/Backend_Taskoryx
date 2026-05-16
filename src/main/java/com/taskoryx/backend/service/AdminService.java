@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -197,12 +198,48 @@ public class AdminService {
         User user = findUserById(userId);
 
         if (user.getId().equals(adminPrincipal.getId())) {
-            throw new BadRequestException("Không thể tự vô hiệu hóa tài khoản của mình");
+            throw new BadRequestException("Không thể thay đổi trạng thái tài khoản của chính mình");
         }
 
         user.setIsActive(!user.getIsActive());
         userRepository.save(user);
         log.info("Admin {} set user {} active={}", adminPrincipal.getEmail(), user.getEmail(), user.getIsActive());
+        return AdminUserResponse.from(user);
+    }
+
+    @Transactional
+    public AdminUserResponse softDeleteUser(UUID userId, UserPrincipal adminPrincipal) {
+        User user = findUserById(userId);
+
+        if (user.getId().equals(adminPrincipal.getId())) {
+            throw new BadRequestException("Không thể tự vô hiệu hóa tài khoản của mình");
+        }
+        if (user.getDeletedAt() != null) {
+            throw new BadRequestException("Tài khoản này đã bị xóa trước đó");
+        }
+
+        user.setIsActive(false);
+        user.setDeletedAt(LocalDateTime.now());
+        userRepository.save(user);
+        log.info("Admin {} soft-deleted user: {}", adminPrincipal.getEmail(), user.getEmail());
+        return AdminUserResponse.from(user);
+    }
+
+    @Transactional
+    public AdminUserResponse activateUser(UUID userId, UserPrincipal adminPrincipal) {
+        User user = findUserById(userId);
+
+        if (user.getId().equals(adminPrincipal.getId())) {
+            throw new BadRequestException("Không thể tự kích hoạt tài khoản của mình");
+        }
+        if (user.getIsActive()) {
+            throw new BadRequestException("Tài khoản này đã đang hoạt động");
+        }
+
+        user.setIsActive(true);
+        user.setDeletedAt(null);
+        userRepository.save(user);
+        log.info("Admin {} activated user: {}", adminPrincipal.getEmail(), user.getEmail());
         return AdminUserResponse.from(user);
     }
 

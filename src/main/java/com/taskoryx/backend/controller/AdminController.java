@@ -148,6 +148,22 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.toggleUserStatus(id, principal)));
     }
 
+    @DeleteMapping("/users/{id}")
+    @Operation(summary = "Vô hiệu hóa tài khoản (soft delete: isActive=false + deletedAt)")
+    public ResponseEntity<ApiResponse<AdminUserResponse>> softDeleteUser(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Đã vô hiệu hóa tài khoản", adminService.softDeleteUser(id, principal)));
+    }
+
+    @PatchMapping("/users/{id}/activate")
+    @Operation(summary = "Kích hoạt lại tài khoản (isActive=true, xóa deletedAt)")
+    public ResponseEntity<ApiResponse<AdminUserResponse>> activateUser(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Đã kích hoạt tài khoản", adminService.activateUser(id, principal)));
+    }
+
     @PostMapping("/users/{id}/reset-password")
     @Operation(summary = "Đặt lại mật khẩu ngẫu nhiên và gửi qua email cho user")
     public ResponseEntity<ApiResponse<Void>> resetPassword(@PathVariable UUID id) {

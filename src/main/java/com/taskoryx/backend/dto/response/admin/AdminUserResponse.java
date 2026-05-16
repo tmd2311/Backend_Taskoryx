@@ -26,6 +26,7 @@ public class AdminUserResponse {
     private Set<RoleResponse> roles;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
+    private LocalDateTime deletedAt;
 
     // Chỉ có giá trị khi admin vừa tạo user, null ở các response khác
     private String temporaryPassword;
@@ -46,6 +47,7 @@ public class AdminUserResponse {
                         .collect(Collectors.toSet()))
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
+                .deletedAt(user.getDeletedAt())
                 .build();
     }
 }

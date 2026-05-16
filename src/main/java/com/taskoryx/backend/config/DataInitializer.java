@@ -61,98 +61,125 @@ public class DataInitializer implements ApplicationRunner {
 
         // ADMIN group
         new PermissionDef("ADMIN_ACCESS",
+                "Truy cập quản trị",
                 "Truy cập trang quản trị hệ thống",
                 "ADMIN"),
         new PermissionDef("TEMPLATE_MANAGE",
+                "Quản lý template",
                 "Tạo, chỉnh sửa và xóa template dự án",
                 "ADMIN"),
 
         // USER group
         new PermissionDef("USER_VIEW",
+                "Xem người dùng",
                 "Xem danh sách và thông tin người dùng",
                 "USER"),
         new PermissionDef("USER_CREATE",
+                "Tạo người dùng",
                 "Tạo tài khoản người dùng mới",
                 "USER"),
         new PermissionDef("USER_UPDATE",
+                "Cập nhật người dùng",
                 "Cập nhật thông tin người dùng",
                 "USER"),
         new PermissionDef("USER_DELETE",
+                "Xóa người dùng",
                 "Xóa tài khoản người dùng",
                 "USER"),
         new PermissionDef("USER_RESET_PASSWORD",
+                "Đặt lại mật khẩu",
                 "Đặt lại mật khẩu người dùng",
                 "USER"),
         new PermissionDef("USER_ASSIGN_ROLE",
+                "Gán vai trò",
                 "Gán và thu hồi role cho người dùng",
                 "USER"),
 
         // PROJECT group
         new PermissionDef("PROJECT_VIEW",
+                "Xem dự án",
                 "Xem danh sách và thông tin dự án",
                 "PROJECT"),
         new PermissionDef("PROJECT_CREATE",
+                "Tạo dự án",
                 "Tạo dự án mới",
                 "PROJECT"),
         new PermissionDef("PROJECT_UPDATE",
+                "Cập nhật dự án",
                 "Cập nhật thông tin dự án",
                 "PROJECT"),
         new PermissionDef("PROJECT_DELETE",
                 "Xóa dự án",
+                "Xóa dự án",
                 "PROJECT"),
         new PermissionDef("PROJECT_ARCHIVE",
+                "Lưu trữ dự án",
                 "Lưu trữ / khôi phục dự án",
                 "PROJECT"),
         new PermissionDef("PROJECT_MANAGE_MEMBERS",
+                "Quản lý thành viên",
                 "Thêm, xóa và phân quyền thành viên dự án",
                 "PROJECT"),
 
         // BOARD group
         new PermissionDef("BOARD_VIEW",
+                "Xem bảng",
                 "Xem bảng Kanban / Scrum",
                 "BOARD"),
         new PermissionDef("BOARD_CREATE",
+                "Tạo bảng",
                 "Tạo bảng mới trong dự án",
                 "BOARD"),
         new PermissionDef("BOARD_UPDATE",
+                "Cập nhật bảng",
                 "Cập nhật cột và cấu hình bảng",
                 "BOARD"),
         new PermissionDef("BOARD_DELETE",
+                "Xóa bảng",
                 "Xóa bảng",
                 "BOARD"),
 
         // TASK group
         new PermissionDef("TASK_VIEW",
+                "Xem công việc",
                 "Xem danh sách và chi tiết công việc",
                 "TASK"),
         new PermissionDef("TASK_CREATE",
+                "Tạo công việc",
                 "Tạo công việc mới",
                 "TASK"),
         new PermissionDef("TASK_UPDATE",
+                "Cập nhật công việc",
                 "Cập nhật thông tin công việc",
                 "TASK"),
         new PermissionDef("TASK_DELETE",
                 "Xóa công việc",
+                "Xóa công việc",
                 "TASK"),
         new PermissionDef("TASK_ASSIGN",
+                "Giao công việc",
                 "Giao công việc cho thành viên khác",
                 "TASK"),
 
         // COMMENT group
         new PermissionDef("COMMENT_CREATE",
+                "Tạo bình luận",
                 "Tạo bình luận trên công việc",
                 "COMMENT"),
         new PermissionDef("COMMENT_DELETE",
+                "Xóa bình luận",
                 "Xóa bình luận",
                 "COMMENT"),
 
         // SPRINT group
         new PermissionDef("SPRINT_MANAGE",
+                "Quản lý sprint",
                 "Tạo, bắt đầu, kết thúc và xóa sprint",
                 "SPRINT"),
 
         // REPORT group
         new PermissionDef("REPORT_VIEW",
+                "Xem báo cáo",
                 "Xem báo cáo và thống kê hiệu suất",
                 "REPORT")
     );
@@ -239,14 +266,19 @@ public class DataInitializer implements ApplicationRunner {
                     .orElseGet(() -> {
                         Permission p = Permission.builder()
                                 .name(def.name())
+                                .displayName(def.displayName())
                                 .description(def.description())
                                 .resource(def.resource())
                                 .build();
                         return permissionRepository.save(p);
                     });
 
-            // Đồng bộ description/resource nếu đã tồn tại nhưng khác
+            // Đồng bộ displayName/description/resource nếu đã tồn tại nhưng khác
             boolean dirty = false;
+            if (!def.displayName().equals(permission.getDisplayName())) {
+                permission.setDisplayName(def.displayName());
+                dirty = true;
+            }
             if (!def.description().equals(permission.getDescription())) {
                 permission.setDescription(def.description());
                 dirty = true;
@@ -353,5 +385,5 @@ public class DataInitializer implements ApplicationRunner {
 
     // ── Internal record ──────────────────────────────────────────────────────
 
-    private record PermissionDef(String name, String description, String resource) {}
+    private record PermissionDef(String name, String displayName, String description, String resource) {}
 }

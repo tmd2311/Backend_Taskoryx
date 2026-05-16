@@ -32,7 +32,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT u FROM User u WHERE u.id IN :ids AND u.isActive = true")
     List<User> findActiveUsersByIds(@Param("ids") List<UUID> ids);
 
-    @Query("SELECT u FROM User u WHERE " +
+    @Query("SELECT u FROM User u WHERE u.deletedAt IS NULL AND " +
            "(:keyword = '' OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')))")

@@ -7,8 +7,10 @@ import com.taskoryx.backend.dto.response.ApiResponse;
 import com.taskoryx.backend.dto.response.comment.MentionedUserInfo;
 import com.taskoryx.backend.dto.response.project.ProjectMemberResponse;
 import com.taskoryx.backend.dto.response.project.ProjectResponse;
+import com.taskoryx.backend.dto.response.stats.ProjectStatsResponse;
 import com.taskoryx.backend.security.UserPrincipal;
 import com.taskoryx.backend.service.ProjectService;
+import com.taskoryx.backend.service.ProjectStatsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -42,6 +44,7 @@ import java.util.UUID;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectStatsService projectStatsService;
 
     @GetMapping
     @Operation(summary = "Lấy danh sách dự án của tôi")
@@ -128,5 +131,13 @@ public class ProjectController {
             @AuthenticationPrincipal UserPrincipal principal) {
         projectService.removeMember(id, userId, principal);
         return ResponseEntity.ok(ApiResponse.success("Xóa thành viên thành công"));
+    }
+
+    @GetMapping("/{id}/stats")
+    @Operation(summary = "Thống kê chi tiết dự án: tổng quan task, biểu đồ hoàn thành, phân bổ thành viên, sprint hiện tại, cảnh báo hạn")
+    public ResponseEntity<ApiResponse<ProjectStatsResponse>> getProjectStats(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success(projectStatsService.getStats(id, principal)));
     }
 }

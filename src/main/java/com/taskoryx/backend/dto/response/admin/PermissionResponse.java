@@ -11,6 +11,7 @@ import java.util.UUID;
 public class PermissionResponse {
     private UUID id;
     private String name;
+    private String displayName;
     private String description;
     private String resource;
 
@@ -18,6 +19,7 @@ public class PermissionResponse {
         return PermissionResponse.builder()
                 .id(permission.getId())
                 .name(permission.getName())
+                .displayName(permission.getDisplayName())
                 .description(permission.getDescription())
                 .resource(permission.getResource())
                 .build();
