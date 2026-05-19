@@ -22,7 +22,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * REST Controller cho User Management
@@ -67,6 +69,16 @@ public class UserController {
             @RequestParam("file") MultipartFile file) throws IOException {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công",
                 userService.uploadAvatar(principal, file)));
+    }
+
+    @GetMapping("/me/permissions")
+    @Operation(summary = "Lấy danh sách quyền của người dùng hiện tại")
+    public ResponseEntity<ApiResponse<Set<String>>> getMyPermissions(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Set<String> permissions = principal.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .collect(Collectors.toSet());
+        return ResponseEntity.ok(ApiResponse.success(permissions));
     }
 
     @GetMapping("/me/performance")
