@@ -1,417 +1,113 @@
-# 🚀 Bắt đầu nhanh với Taskoryx Backend
+# Bắt đầu nhanh với Taskoryx Backend
 
-## 📌 Bạn ở đâu trong hành trình?
+## Yêu cầu
 
-Hiện tại bạn đã có:
-- ✅ Database schema hoàn chỉnh (15 tables)
-- ✅ 11 Entity classes đầy đủ
-- ✅ Documentation chi tiết
-- ✅ Project structure
+- Java 17+
+- Maven 3.8+ (hoặc dùng `./mvnw` đi kèm)
+- PostgreSQL 14+
 
 ---
 
-## ⚡ 5 phút setup database
+## 1. Tạo database
 
-### Bước 1: Cài PostgreSQL
 ```bash
-# Windows: Download từ postgresql.org
-# Mac: brew install postgresql
-# Linux: sudo apt-get install postgresql
-```
-
-### Bước 2: Tạo database
-```bash
-# Mở PostgreSQL
 psql -U postgres
-
-# Trong psql, chạy:
-\i E:/DOAN/BE/database-init.sql
-\c taskoryx_dev
-\i E:/DOAN/BE/schema.sql
-
-# Verify
-\dt
-SELECT * FROM users;
-```
-
-✅ **Kết quả**: 15 tables, 1 admin user, 1 sample project
-
-### Bước 3: Cấu hình Spring Boot
-```yaml
-# File: src/main/resources/application.yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/taskoryx_dev
-    username: postgres
-    password: your_password  # <-- THAY ĐỔI NÀY
-```
-
-### Bước 4: Chạy thử
-```bash
-./mvnw spring-boot:run
-```
-
-✅ **Kết quả**: Server chạy ở http://localhost:8080
-
----
-
-## 📚 Đọc tài liệu nào đầu tiên?
-
-Tùy theo mục đích:
-
-### 🎯 Muốn hiểu database design?
-→ Đọc **DATABASE_DESIGN.md**
-- Chi tiết 15 tables
-- Mối quan hệ giữa các entity
-- Business rules
-
-### 🏗️ Muốn bắt đầu code ngay?
-→ Đọc **SETUP_GUIDE.md**
-- Setup từng bước
-- Code examples
-- Troubleshooting
-
-### 📋 Muốn biết làm gì tiếp theo?
-→ Đọc **DEVELOPMENT_CHECKLIST.md**
-- Task breakdown chi tiết
-- 10 phases phát triển
-- Progress tracking
-
-### 👀 Muốn overview tổng thể?
-→ Đọc **README.md**
-- Tổng quan dự án
-- Features & roadmap
-- Tech stack
-
-### 🗺️ Muốn xem cấu trúc database?
-→ Đọc **ERD.md**
-- Entity Relationship Diagram
-- Visual representation
-- Design decisions
-
----
-
-## 🎯 Roadmap 6 tuần (MVP)
-
-```
-Week 1: Repositories & Basic Services
-├─ Day 1-2: Create all Repository interfaces
-├─ Day 3-4: UserService & AuthService
-└─ Day 5-7: ProjectService & TaskService
-
-Week 2: Security & Authentication
-├─ Day 1-3: JWT setup & SecurityConfig
-├─ Day 4-5: AuthController & login/register
-└─ Day 6-7: Testing authentication
-
-Week 3: Core API Controllers
-├─ Day 1-2: UserController & ProjectController
-├─ Day 3-4: TaskController & BoardController
-└─ Day 5-7: CommentController & testing
-
-Week 4: DTOs & Validation
-├─ Day 1-3: Request/Response DTOs
-├─ Day 4-5: Validation rules
-└─ Day 6-7: Exception handling
-
-Week 5: Advanced Features
-├─ Day 1-3: File upload
-├─ Day 4-5: Notifications
-└─ Day 6-7: Activity logging
-
-Week 6: Testing & Documentation
-├─ Day 1-3: Integration tests
-├─ Day 4-5: API documentation (Swagger)
-└─ Day 6-7: Final testing & deployment prep
-```
-
----
-
-## 💻 Lệnh thường dùng
-
-### Maven
-```bash
-# Build project
-./mvnw clean install
-
-# Run application
-./mvnw spring-boot:run
-
-# Run tests
-./mvnw test
-
-# Skip tests
-./mvnw clean install -DskipTests
-
-# Run specific test
-./mvnw test -Dtest=UserServiceTest
-```
-
-### PostgreSQL
-```bash
-# Connect to database
-psql -U postgres -d taskoryx_dev
-
-# List tables
-\dt
-
-# Describe table
-\d users
-
-# Run SQL file
-\i schema.sql
-
-# Show all databases
-\l
-
-# Exit
+CREATE DATABASE taskoryx;
 \q
 ```
 
-### Git
-```bash
-# Clone repository (nếu có remote)
-git clone <url>
-
-# Create feature branch
-git checkout -b feature/user-service
-
-# Commit changes
-git add .
-git commit -m "Add UserService with CRUD operations"
-
-# Push to remote
-git push origin feature/user-service
-```
-
 ---
 
-## 📝 Checklist: Bắt đầu code
+## 2. Cấu hình
 
-### Setup môi trường
-- [ ] Java 17 installed
-- [ ] PostgreSQL installed
-- [ ] IDE setup (IntelliJ/Eclipse/VS Code)
-- [ ] Maven working
-- [ ] Database created
-- [ ] Tables created
-- [ ] Sample data inserted
+Mở `src/main/resources/application.yaml`, kiểm tra thông tin kết nối:
 
-### Code structure
-- [ ] Package structure created
-- [ ] Entity classes reviewed
-- [ ] Application.yaml configured
-- [ ] Lombok plugin installed
-
-### First implementation
-- [ ] Create UserRepository
-- [ ] Create UserService
-- [ ] Write UserService test
-- [ ] Create AuthController
-- [ ] Test with Postman/curl
-
----
-
-## 🎓 Entity Classes Guide
-
-### Quan hệ giữa các entity
-
-```
-User
-├─ owns → Project
-├─ member of → ProjectMember
-├─ assigned to → Task
-└─ creates → Comment
-
-Project
-├─ has → Board
-├─ has → Task
-├─ has → Label
-└─ has → ProjectMember
-
-Board
-├─ has → Column
-└─ displays → Task
-
-Column
-└─ contains → Task
-
-Task
-├─ has → Comment
-├─ has → Attachment
-└─ has → TaskLabel
-```
-
-### Sử dụng Entity classes
-
-```java
-// Tạo User mới
-User user = User.builder()
-    .username("john_doe")
-    .email("john@example.com")
-    .passwordHash(passwordEncoder.encode("password"))
-    .fullName("John Doe")
-    .build();
-
-// Tạo Project
-Project project = Project.builder()
-    .name("My Project")
-    .key("MYPROJ")
-    .owner(user)
-    .color("#1976d2")
-    .build();
-
-// Tạo Task
-Task task = Task.builder()
-    .project(project)
-    .board(board)
-    .column(column)
-    .title("Implement login feature")
-    .priority(Task.TaskPriority.HIGH)
-    .reporter(user)
-    .build();
-```
-
----
-
-## 🔥 Tips quan trọng
-
-### 1. Database Migrations
-**Hiện tại**: Đang dùng `schema.sql` để tạo tables
-**Production**: Nên dùng Flyway hoặc Liquibase
-
-### 2. Security
 ```yaml
-# KHÔNG commit password vào git
-# Dùng environment variables
-DB_PASSWORD=${DB_PASSWORD:your_default_password}
-JWT_SECRET=${JWT_SECRET:your_secret_key}
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/taskoryx
+    username: postgres
+    password: 123456   # đổi nếu khác
 ```
 
-### 3. Testing
-```java
-// Viết test cho mỗi service method
-@Test
-void shouldCreateUser() {
-    // Given
-    User user = createTestUser();
-
-    // When
-    User saved = userService.create(user);
-
-    // Then
-    assertNotNull(saved.getId());
-}
-```
-
-### 4. API Design
-```
-✅ Good:
-POST   /api/projects/{id}/tasks
-GET    /api/tasks/{id}
-PUT    /api/tasks/{id}
-
-❌ Bad:
-POST   /api/createTask
-GET    /api/getTaskById?id=123
-```
+Schema sẽ tự cập nhật khi khởi động (`ddl-auto: update`).
 
 ---
 
-## 🐛 Lỗi thường gặp
-
-### 1. Lombok không hoạt động
-```
-Error: Cannot resolve symbol 'builder'
-```
-**Fix**:
-- Install Lombok plugin trong IDE
-- Enable annotation processing
-- Rebuild project
-
-### 2. Database connection refused
-```
-Error: Connection refused
-```
-**Fix**:
-- Check PostgreSQL đã chạy chưa
-- Verify port 5432
-- Check username/password
-
-### 3. Table already exists
-```
-Error: Table 'users' already exists
-```
-**Fix**:
-- Đổi `spring.jpa.hibernate.ddl-auto` → `validate`
-- Hoặc drop database và tạo lại
-
-### 4. Foreign key constraint
-```
-Error: violates foreign key constraint
-```
-**Fix**:
-- Insert parent entity trước
-- Hoặc set child entity's FK = null
-
----
-
-## 📞 Cần giúp đỡ?
-
-### Tài liệu có sẵn
-1. **SETUP_GUIDE.md** - Setup chi tiết
-2. **DATABASE_DESIGN.md** - Database design
-3. **DEVELOPMENT_CHECKLIST.md** - Task list
-4. **SUMMARY.md** - Tổng quan file đã tạo
-
-### Online Resources
-- Spring Boot Docs: https://spring.io/projects/spring-boot
-- PostgreSQL Docs: https://www.postgresql.org/docs/
-- Stack Overflow: Tag `spring-boot`
-
-### Debug Tips
-1. Đọc error message kỹ
-2. Google full error message
-3. Check logs trong console
-4. Use debugger trong IDE
-5. Print SQL queries (`show-sql: true`)
-
----
-
-## ✅ Ready to code?
-
-Bạn đã sẵn sàng! Bắt đầu với:
+## 3. Chạy ứng dụng
 
 ```bash
-# 1. Tạo UserRepository
-# File: src/main/java/com/taskoryx/backend/repository/UserRepository.java
+./mvnw spring-boot:run
+```
 
-@Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
-    Optional<User> findByEmail(String email);
-    Optional<User> findByUsername(String username);
-}
+Kiểm tra:
+- Health check: `http://localhost:8080/api/actuator/health`
+- Swagger UI: `http://localhost:8080/api/swagger-ui.html`
 
-# 2. Tạo UserService
-# File: src/main/java/com/taskoryx/backend/service/UserService.java
+---
 
-@Service
-public class UserService {
-    @Autowired
-    private UserRepository userRepository;
+## 4. Tài khoản admin mặc định
 
-    public User create(User user) {
-        // TODO: Implement
-    }
-}
+`DemoDataInitializer` tự seed dữ liệu khi khởi động lần đầu. Tài khoản admin được tạo sẵn — xem logs console sau khi start để lấy thông tin.
 
-# 3. Test it!
+---
+
+## 5. Lệnh thường dùng
+
+```bash
+# Compile nhanh (kiểm tra lỗi)
+./mvnw compile
+
+# Chạy tất cả tests
+./mvnw test
+
+# Chạy 1 test class
+./mvnw test -Dtest=TaskServiceTest
+
+# Build JAR (bỏ qua tests)
+./mvnw clean package -DskipTests
+
+# Chạy JAR
+java -jar target/taskoryx-backend-1.0.0.jar
 ```
 
 ---
 
-**Good luck! 🚀**
+## 6. Lỗi thường gặp
 
-Bắt đầu với Repository layer, sau đó Services, rồi Controllers.
+### Connection refused
+```
+✅ Kiểm tra PostgreSQL đang chạy:
+   Windows: Services → PostgreSQL
+   Linux/macOS: systemctl status postgresql / brew services list
+```
 
-Nhớ check **DEVELOPMENT_CHECKLIST.md** để track progress!
+### Port 8080 đã bị dùng
+```yaml
+# Đổi port trong application.yaml:
+server:
+  port: 8081
+```
+
+### JWT signature does not match
+```
+✅ Clear token cũ trên client, đăng nhập lại.
+   JWT secret phải >= 256 bits.
+```
+
+### Table / column không tồn tại
+```
+✅ ddl-auto: update sẽ tự tạo/cập nhật schema.
+   Nếu vẫn lỗi, drop database rồi tạo lại.
+```
+
+---
+
+## 7. Tài liệu liên quan
+
+| File | Nội dung |
+|------|---------|
+| `README.md` | Tổng quan dự án, kiến trúc |
+| `CONFIG_GUIDE.md` | Cấu hình nâng cao (email, S3, AI, production) |
+| `docs/frontend-api-guide.md` | Hướng dẫn tích hợp API cho Frontend |
+| `docs/DATABASE_GUIDE.md` | Schema database chi tiết |

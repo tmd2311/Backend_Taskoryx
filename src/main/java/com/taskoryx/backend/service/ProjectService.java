@@ -13,6 +13,7 @@ import com.taskoryx.backend.dto.response.template.TemplateConfigDto;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.Project;
+import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.ProjectMember;
 import com.taskoryx.backend.entity.User;
@@ -23,6 +24,7 @@ import com.taskoryx.backend.repository.BoardColumnRepository;
 import com.taskoryx.backend.repository.BoardRepository;
 import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.ProjectRepository;
+import com.taskoryx.backend.repository.SprintRepository;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.repository.UserRepository;
 import com.taskoryx.backend.security.UserPrincipal;
@@ -44,6 +46,7 @@ public class ProjectService {
     private final BoardRepository boardRepository;
     private final BoardColumnRepository boardColumnRepository;
     private final TaskRepository taskRepository;
+    private final SprintRepository sprintRepository;
     private final ProjectAuthorizationService projectAuthorizationService;
     private final ProjectCapabilityService projectCapabilityService;
     private final ObjectMapper objectMapper;
@@ -152,6 +155,9 @@ public class ProjectService {
                               "Vui lòng xóa hết task trước khi xóa dự án.", taskCount));
         }
 
+        // Xóa sprints trước để tránh FK violation khi boards bị cascade delete
+        sprintRepository.deleteByProjectId(projectId);
+
         projectRepository.delete(project);
     }
 
@@ -252,17 +258,22 @@ public class ProjectService {
         board = boardRepository.save(board);
 
         // Tạo các cột mặc định
-        String[] defaultColumns = {"Cần làm", "Đang làm", "Đã xong"};
-        boolean[] completedFlags = {false, false, true};
-        String[] colors = {"#6b7280", "#3b82f6", "#22c55e"};
+        record ColDef(String name, String color, boolean isCompleted, Task.TaskStatus status) {}
+        List<ColDef> cols = List.of(
+            new ColDef("Cần làm",  "#6b7280", false, Task.TaskStatus.TODO),
+            new ColDef("Đang làm", "#3b82f6", false, Task.TaskStatus.IN_PROGRESS),
+            new ColDef("Đã xong",  "#22c55e", true,  Task.TaskStatus.DONE)
+        );
 
-        for (int i = 0; i < defaultColumns.length; i++) {
+        for (int i = 0; i < cols.size(); i++) {
+            ColDef def = cols.get(i);
             BoardColumn column = BoardColumn.builder()
                     .board(board)
-                    .name(defaultColumns[i])
+                    .name(def.name())
                     .position(i)
-                    .color(colors[i])
-                    .isCompleted(completedFlags[i])
+                    .color(def.color())
+                    .isCompleted(def.isCompleted())
+                    .mappedStatus(def.status())
                     .build();
             boardColumnRepository.save(column);
         }

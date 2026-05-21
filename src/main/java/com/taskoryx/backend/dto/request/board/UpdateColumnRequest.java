@@ -1,5 +1,6 @@
 package com.taskoryx.backend.dto.request.board;
 
+import com.taskoryx.backend.entity.Task;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -18,4 +19,6 @@ public class UpdateColumnRequest {
 
     @Min(value = 1, message = "Giới hạn task phải lớn hơn 0")
     private Integer taskLimit;
+
+    private Task.TaskStatus mappedStatus;
 }

@@ -11,6 +11,7 @@ import com.taskoryx.backend.dto.response.board.KanbanBoardResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
+import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.Sprint;
 import com.taskoryx.backend.entity.User;
@@ -120,7 +121,21 @@ public class BoardService {
                 .owner(owner)
                 .isDefault(false)
                 .build();
-        return toBoardResponse(boardRepository.save(board));
+        board = boardRepository.save(board);
+
+        if (boardType == Board.BoardType.PERSONAL) {
+            BoardColumn doneColumn = BoardColumn.builder()
+                    .board(board)
+                    .name("Hoàn thành")
+                    .position(0)
+                    .color("#22c55e")
+                    .isCompleted(true)
+                    .mappedStatus(Task.TaskStatus.DONE)
+                    .build();
+            boardColumnRepository.save(doneColumn);
+        }
+
+        return toBoardResponse(board);
     }
 
     @Transactional
@@ -158,6 +173,9 @@ public class BoardService {
         if (isSprintManagedBoard(board)) {
             throw new BadRequestException("Không thể thêm cột vào board sprint — các cột được quản lí tự động theo trạng thái task");
         }
+        if (board.getBoardType() == Board.BoardType.PERSONAL && request.getMappedStatus() == null) {
+            throw new BadRequestException("Board cá nhân yêu cầu phải chọn trạng thái (mappedStatus) cho mỗi cột");
+        }
 
         Integer maxPos = boardColumnRepository.findMaxPositionByBoardId(boardId);
         BoardColumn column = BoardColumn.builder()
@@ -166,6 +184,7 @@ public class BoardService {
                 .color(request.getColor())
                 .isCompleted(request.getIsCompleted() != null ? request.getIsCompleted() : false)
                 .taskLimit(request.getTaskLimit())
+                .mappedStatus(request.getMappedStatus())
                 .position(maxPos != null ? maxPos + 1 : 0)
                 .build();
         return BoardColumnResponse.from(boardColumnRepository.save(column));
@@ -185,6 +204,7 @@ public class BoardService {
         if (request.getColor() != null) column.setColor(request.getColor());
         if (request.getIsCompleted() != null) column.setIsCompleted(request.getIsCompleted());
         if (request.getTaskLimit() != null) column.setTaskLimit(request.getTaskLimit());
+        if (request.getMappedStatus() != null) column.setMappedStatus(request.getMappedStatus());
         return BoardColumnResponse.from(boardColumnRepository.save(column));
     }
 
