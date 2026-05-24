@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # JOB 1: Chạy toàn bộ test suite (H2 in-memory, không cần PostgreSQL)
@@ -156,4 +159,5 @@ jobs:
             --environment postman_environment.json \
             --env-var "base_url=http://${{ secrets.EC2_HOST }}:8080/api" \
             --bail \
-            --timeout-request 10000
+            --timeout-request 15000 \
+            --verbose

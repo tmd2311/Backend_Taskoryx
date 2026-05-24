@@ -44,7 +44,7 @@
               "script": {
                 "exec": [
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                  "const data = pm.response.json().data;",
+                  "var data = pm.response.json().data;",
                   "pm.test(\"Has accessToken\", () => pm.expect(data.accessToken).to.not.be.empty);",
                   "pm.test(\"TokenType is Bearer\", () => pm.expect(data.tokenType).to.eql('Bearer'));",
                   "pm.environment.set('access_token', data.accessToken);",
@@ -160,7 +160,7 @@
               "script": {
                 "exec": [
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                  "const data = pm.response.json().data;",
+                  "var data = pm.response.json().data;",
                   "pm.test(\"Has new accessToken\", () => pm.expect(data.accessToken).to.not.be.empty);",
                   "pm.environment.set('access_token', data.accessToken);"
                 ],
@@ -266,7 +266,7 @@
               "script": {
                 "exec": [
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                  "const data = pm.response.json().data;",
+                  "var data = pm.response.json().data;",
                   "pm.test(\"Email matches admin\", () => pm.expect(data.email).to.eql('admin@taskoryx.com'));",
                   "pm.environment.set('user_id', data.id);"
                 ],
@@ -354,7 +354,7 @@
               "script": {
                 "exec": [
                   "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
-                  "const data = pm.response.json().data;",
+                  "var data = pm.response.json().data;",
                   "pm.test(\"Key is NWM\", () => pm.expect(data.key).to.eql('NWM'));",
                   "pm.environment.set('project_id', data.id);"
                 ],
@@ -622,7 +622,7 @@
               "script": {
                 "exec": [
                   "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
-                  "const data = pm.response.json().data;",
+                  "var data = pm.response.json().data;",
                   "pm.test(\"Status is PLANNED\", () => pm.expect(data.status).to.eql('PLANNED'));",
                   "pm.environment.set('sprint_id', data.id);"
                 ],
@@ -873,7 +873,7 @@
               "script": {
                 "exec": [
                   "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
-                  "const data = pm.response.json().data;",
+                  "var data = pm.response.json().data;",
                   "pm.test(\"Title matches\", () => pm.expect(data.title).to.eql('First Task'));",
                   "pm.environment.set('task_id', data.id);"
                 ],
