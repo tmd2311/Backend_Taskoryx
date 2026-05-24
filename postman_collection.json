@@ -4,7 +4,10 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8080/api" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/api"
+    }
   ],
   "item": [
     {
@@ -14,8 +17,22 @@
           "name": "Login",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/auth/login" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"email\":\"admin@taskoryx.com\",\"password\":\"Admin@123456\"}"
@@ -42,8 +59,22 @@
           "name": "Login - Wrong Password (401)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/auth/login" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"email\":\"admin@taskoryx.com\",\"password\":\"wrong\"}"
@@ -65,8 +96,22 @@
           "name": "Login - Missing Email (400)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/auth/login" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"password\":\"Admin@123456\"}"
@@ -88,8 +133,22 @@
           "name": "Refresh Token",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/auth/refresh" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"refreshToken\":\"{{refresh_token}}\"}"
@@ -114,8 +173,22 @@
           "name": "Refresh Token - Invalid (400)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/auth/refresh" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"refreshToken\":\"this.is.garbage\"}"
@@ -143,7 +216,16 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/users/me" }
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            }
           },
           "event": [
             {
@@ -161,8 +243,22 @@
           "name": "Get Me",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/users/me" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            }
           },
           "event": [
             {
@@ -183,8 +279,28 @@
           "name": "Search Users",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/users/search?keyword=admin" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/search?keyword=admin",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "keyword",
+                  "value": "admin"
+                }
+              ]
+            }
           },
           "event": [
             {
@@ -209,10 +325,24 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/projects" },
+            "url": {
+              "raw": "{{base_url}}/projects",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"name\":\"Newman Test Project\",\"key\":\"NWM\",\"isPublic\":false}"
@@ -238,10 +368,24 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/projects" },
+            "url": {
+              "raw": "{{base_url}}/projects",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"name\":\"Bad Key\",\"key\":\"abc\"}"
@@ -263,8 +407,21 @@
           "name": "Create Project - No Auth (401)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/projects" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"name\":\"Unauthorized\",\"key\":\"UNA\"}"
@@ -286,8 +443,21 @@
           "name": "Get My Projects",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/projects" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects"
+              ]
+            }
           },
           "event": [
             {
@@ -306,8 +476,22 @@
           "name": "Get Project Detail",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}"
+              ]
+            }
           },
           "event": [
             {
@@ -326,8 +510,22 @@
           "name": "Get Project - Not Found (404)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/projects/00000000-0000-0000-0000-000000000000" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            }
           },
           "event": [
             {
@@ -346,10 +544,25 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}" },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"name\":\"Newman Project Updated\",\"key\":\"NWM\"}"
@@ -378,10 +591,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}/sprints" },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/sprints",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}",
+                "sprints"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"name\":\"Sprint 1\",\"goal\":\"Deliver MVP\"}"
@@ -406,8 +635,23 @@
           "name": "List Sprints",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}/sprints" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/sprints",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}",
+                "sprints"
+              ]
+            }
           },
           "event": [
             {
@@ -426,8 +670,23 @@
           "name": "Start Sprint",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/sprints/{{sprint_id}}/start" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sprints/{{sprint_id}}/start",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sprints",
+                "{{sprint_id}}",
+                "start"
+              ]
+            }
           },
           "event": [
             {
@@ -476,16 +735,46 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/sprints/{{conflict_sprint_id}}/start" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sprints/{{conflict_sprint_id}}/start",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sprints",
+                "{{conflict_sprint_id}}",
+                "start"
+              ]
+            }
           }
         },
         {
           "name": "Complete Sprint",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/sprints/{{sprint_id}}/complete" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sprints/{{sprint_id}}/complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sprints",
+                "{{sprint_id}}",
+                "complete"
+              ]
+            }
           },
           "event": [
             {
@@ -510,10 +799,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}/sprints" },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/sprints",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}",
+                "sprints"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"name\":\"Sprint For Tasks\"}"
@@ -537,10 +842,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}/tasks" },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}",
+                "tasks"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"title\":\"First Task\",\"sprintId\":\"{{task_sprint_id}}\",\"priority\":\"MEDIUM\"}"
@@ -566,10 +887,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}/tasks" },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}",
+                "tasks"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"sprintId\":\"{{task_sprint_id}}\"}"
@@ -591,8 +928,23 @@
           "name": "Get Tasks by Project",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}/tasks" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}",
+                "tasks"
+              ]
+            }
           },
           "event": [
             {
@@ -610,8 +962,22 @@
           "name": "Get Task Detail",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/tasks/{{task_id}}" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
           },
           "event": [
             {
@@ -630,8 +996,22 @@
           "name": "Get Task - Not Found (404)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/tasks/00000000-0000-0000-0000-000000000000" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            }
           },
           "event": [
             {
@@ -650,10 +1030,26 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/tasks/{{task_id}}/status" },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{task_id}}",
+                "status"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"status\":\"IN_PROGRESS\"}"
@@ -677,10 +1073,25 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
             ],
-            "url": { "raw": "{{base_url}}/tasks/{{task_id}}" },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{task_id}}"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\"title\":\"Updated Task Title\",\"priority\":\"HIGH\"}"
@@ -703,8 +1114,22 @@
           "name": "Delete Task",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/tasks/{{task_id}}" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{task_id}}"
+              ]
+            }
           },
           "event": [
             {
@@ -727,8 +1152,23 @@
           "name": "Get Sprint Kanban",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/sprints/{{sprint_id}}/kanban" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sprints/{{sprint_id}}/kanban",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sprints",
+                "{{sprint_id}}",
+                "kanban"
+              ]
+            }
           },
           "event": [
             {
@@ -751,8 +1191,22 @@
           "name": "Delete Project",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-            "url": { "raw": "{{base_url}}/projects/{{project_id}}" }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}"
+              ]
+            }
           },
           "event": [
             {
