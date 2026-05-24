@@ -183,5 +183,3 @@ jobs:
             --env-var "base_url=http://${{ secrets.EC2_HOST }}:8080/api" \
             --bail \
             --timeout-request 10000
-        env:
-          # Không cần biến nhạy cảm — Newman tự login qua API và lấy token
