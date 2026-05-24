@@ -121,16 +121,17 @@ jobs:
             export $(grep -v '^#' $APP_DIR/.env | xargs)
 
             # Dừng instance cũ (nếu có) — gửi SIGTERM để Spring Boot graceful shutdown
-            OLD_PID=$(pgrep -f "app.jar" || true)
-            if [ -n "$OLD_PID" ]; then
+            # Dùng pkill thay vì kill để tránh set -e bắt exit code 143
+            if pgrep -f "app.jar" > /dev/null 2>&1; then
+              OLD_PID=$(pgrep -f "app.jar" | head -1)
               echo "Stopping old process PID=$OLD_PID..."
-              kill -15 $OLD_PID
+              kill -15 "$OLD_PID" 2>/dev/null || true
               for i in $(seq 1 10); do
                 sleep 1
-                kill -0 $OLD_PID 2>/dev/null || break
+                kill -0 "$OLD_PID" 2>/dev/null || break
               done
               # Nếu sau 10s vẫn còn sống thì SIGKILL
-              kill -0 $OLD_PID 2>/dev/null && kill -9 $OLD_PID || true
+              kill -0 "$OLD_PID" 2>/dev/null && kill -9 "$OLD_PID" 2>/dev/null || true
             fi
 
             # Khởi động instance mới
