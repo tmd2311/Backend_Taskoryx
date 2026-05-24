@@ -2,7 +2,7 @@ package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.config.AppProperties;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -18,7 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 @Service
-@Profile("prod")
+@ConditionalOnProperty(name = "application.storage.use-s3", havingValue = "true")
 @Slf4j
 public class S3StorageService implements StorageService {
 

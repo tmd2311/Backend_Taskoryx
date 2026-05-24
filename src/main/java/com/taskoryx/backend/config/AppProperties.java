@@ -35,6 +35,7 @@ public class AppProperties {
     @Setter
     public static class Storage {
         private String uploadDir = "uploads";
+        private boolean useS3 = false;
         private long maxFileSize = 10 * 1024 * 1024; // 10MB
         private List<String> allowedTypes = List.of(
                 // Images

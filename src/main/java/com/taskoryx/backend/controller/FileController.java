@@ -4,7 +4,7 @@ import com.taskoryx.backend.config.AppProperties;
 import com.taskoryx.backend.service.StorageService;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +24,7 @@ import java.io.InputStream;
  */
 @RestController
 @RequestMapping("/files")
-@Profile("!prod")
+@ConditionalOnProperty(name = "application.storage.use-s3", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
 @Hidden
 public class FileController {

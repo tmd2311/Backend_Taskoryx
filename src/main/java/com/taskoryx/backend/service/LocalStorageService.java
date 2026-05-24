@@ -3,7 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.config.AppProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,7 +15,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 @Service
-@Profile("!prod")
+@ConditionalOnProperty(name = "application.storage.use-s3", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
 @Slf4j
 public class LocalStorageService implements StorageService {
