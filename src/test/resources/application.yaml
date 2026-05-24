@@ -30,14 +30,12 @@ jwt:
 
 application:
   frontend-url: http://localhost:5173
-
-app:
   cors:
     allowed-origins:
       - http://localhost:5173
       - http://localhost:3000
-  upload:
-    dir: uploads-test/
+  storage:
+    upload-dir: uploads-test
     use-s3: false
 
 springdoc:
