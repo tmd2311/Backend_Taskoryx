@@ -112,42 +112,14 @@ jobs:
           script: |
             set -e
             APP_DIR=/home/ubuntu/taskoryx-backend
-            JAR=$APP_DIR/app.jar
             LOG=$APP_DIR/logs/app.log
 
             mkdir -p $APP_DIR/logs $APP_DIR/uploads
 
-            # Load biến môi trường từ file .env trên EC2
-            export $(grep -v '^#' $APP_DIR/.env | xargs)
+            # Dùng systemd để stop/start — tránh SIGTERM lan sang SSH session
+            sudo systemctl restart taskoryx
+            echo "Service restarted, waiting for health check..."
 
-            # Dừng instance cũ (nếu có) — gửi SIGTERM để Spring Boot graceful shutdown
-            # Dùng pkill thay vì kill để tránh set -e bắt exit code 143
-            if pgrep -f "app.jar" > /dev/null 2>&1; then
-              OLD_PID=$(pgrep -f "app.jar" | head -1)
-              echo "Stopping old process PID=$OLD_PID..."
-              kill -15 "$OLD_PID" 2>/dev/null || true
-              for i in $(seq 1 10); do
-                sleep 1
-                kill -0 "$OLD_PID" 2>/dev/null || break
-              done
-              # Nếu sau 10s vẫn còn sống thì SIGKILL
-              kill -0 "$OLD_PID" 2>/dev/null && kill -9 "$OLD_PID" 2>/dev/null || true
-            fi
-
-            # Khởi động instance mới
-            echo "Starting new instance..."
-            nohup java \
-              -Xms256m -Xmx512m \
-              -Dspring.profiles.active=prod \
-              -jar $JAR \
-              > $LOG 2>&1 &
-
-            NEW_PID=$!
-            echo "Started with PID=$NEW_PID"
-
-            # Health check — script SSH đang chạy trên EC2
-            # nên gọi localhost:8080 là đúng (tức là app vừa start trên EC2)
-            echo "Waiting for health check..."
             for i in $(seq 1 18); do
               sleep 10
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/actuator/health || true)
@@ -159,7 +131,7 @@ jobs:
             done
 
             echo "ERROR: App không khởi động sau 180s"
-            tail -50 $LOG
+            sudo journalctl -u taskoryx -n 50 --no-pager
             exit 1
 
   # ─────────────────────────────────────────────────────────────────────────────
