@@ -706,27 +706,52 @@
           ]
         },
         {
-          "name": "Start Sprint - Already Active (400)",
+          "name": "Create Conflict Sprint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/sprints",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{project_id}}",
+                "sprints"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Sprint Conflict\"}"
+            }
+          },
           "event": [
             {
-              "listen": "prerequest",
+              "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "const baseUrl = pm.collectionVariables.get('base_url');",
-                  "const projectId = pm.environment.get('project_id');",
-                  "const token = pm.environment.get('access_token');",
-                  "pm.sendRequest({",
-                  "  url: baseUrl + '/projects/' + projectId + '/sprints',",
-                  "  method: 'POST',",
-                  "  header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
-                  "  body: { mode: 'raw', raw: JSON.stringify({ name: 'Sprint Conflict' }) }",
-                  "}, (err, res) => {",
-                  "  pm.environment.set('conflict_sprint_id', res.json().data.id);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "var data = pm.response.json().data;",
+                  "pm.environment.set(\"conflict_sprint_id\", data.id);"
+                ]
               }
-            },
+            }
+          ]
+        },
+        {
+          "name": "Start Sprint - Already Active (400)",
+          "event": [
             {
               "listen": "test",
               "script": {
