@@ -308,7 +308,11 @@
               "script": {
                 "exec": [
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"Returns array\", () => pm.expect(pm.response.json().data).to.be.an('array'));"
+                  "pm.test(\"Returns paged result\", () => {",
+                  "  var data = pm.response.json().data;",
+                  "  pm.expect(data).to.have.property(\"content\");",
+                  "  pm.expect(data.content).to.be.an(\"array\");",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
