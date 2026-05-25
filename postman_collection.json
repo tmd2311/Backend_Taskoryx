@@ -349,17 +349,30 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"name\":\"Newman Test Project\",\"key\":\"NWM\",\"isPublic\":false}"
+              "raw": "{\"name\":\"Newman Test Project\",\"key\":\"{{project_key}}\",\"isPublic\":false}"
             }
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';",
+                  "var key = '';",
+                  "for (var i = 0; i < 3; i++) { key += chars.charAt(Math.floor(Math.random() * chars.length)); }",
+                  "key = 'NW' + key;",
+                  "pm.environment.set('project_key', key);"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
                   "var data = pm.response.json().data;",
-                  "pm.test(\"Key is NWM\", () => pm.expect(data.key).to.eql('NWM'));",
+                  "pm.test('Key matches generated key', () => pm.expect(data.key).to.eql(pm.environment.get('project_key')));",
                   "pm.environment.set('project_id', data.id);"
                 ],
                 "type": "text/javascript"
