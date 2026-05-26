@@ -258,8 +258,11 @@ public class AttachmentService {
 
         AttachmentResponse response = AttachmentResponse.from(attachmentRepository.save(attachment));
 
+        String uploadDesc = uploader.getFullName() + " đã tải lên file \"" + attachment.getFileName()
+                + "\" vào task [" + task.getTaskKey() + "] " + task.getTitle();
         activityLogService.logActivity(uploader, task.getProject(),
                 ActivityLog.EntityType.ATTACHMENT, attachment.getId(), ActivityLog.Action.CREATE,
+                task.getTaskKey() + " - " + task.getTitle(), uploadDesc,
                 null, "{\"fileName\":\"" + attachment.getFileName() + "\",\"taskId\":\"" + task.getId() + "\"}");
 
         return response;
@@ -336,9 +339,13 @@ public class AttachmentService {
         }
 
         User actor = userRepository.findById(principal.getId()).orElseThrow();
-        activityLogService.logActivity(actor, attachment.getTask().getProject(),
+        Task attachTask = attachment.getTask();
+        String deleteAttachDesc = actor.getFullName() + " đã xóa file \"" + attachment.getFileName()
+                + "\" khỏi task [" + attachTask.getTaskKey() + "] " + attachTask.getTitle();
+        activityLogService.logActivity(actor, attachTask.getProject(),
                 ActivityLog.EntityType.ATTACHMENT, attachment.getId(), ActivityLog.Action.DELETE,
-                "{\"fileName\":\"" + attachment.getFileName() + "\",\"taskId\":\"" + attachment.getTask().getId() + "\"}", null);
+                attachTask.getTaskKey() + " - " + attachTask.getTitle(), deleteAttachDesc,
+                "{\"fileName\":\"" + attachment.getFileName() + "\",\"taskId\":\"" + attachTask.getId() + "\"}", null);
 
         storageService.delete(attachment.getStoragePath());
         attachmentRepository.delete(attachment);

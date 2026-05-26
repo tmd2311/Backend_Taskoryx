@@ -50,6 +50,12 @@ public class ActivityLog {
     @Column(nullable = false, length = 50)
     private Action action;
 
+    @Column(name = "entity_title", length = 500)
+    private String entityTitle;
+
+    @Column(name = "description", length = 1000)
+    private String description;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_value", columnDefinition = "jsonb")
     private String oldValue;
@@ -89,7 +95,15 @@ public class ActivityLog {
         DELETE,
         MOVE,
         ASSIGN,
-        COMPLETE
+        COMPLETE,
+        STATUS_CHANGE,
+        MEMBER_ADDED,
+        MEMBER_REMOVED,
+        COMMENT_ADDED,
+        COMMENT_UPDATED,
+        COMMENT_DELETED,
+        SPRINT_STARTED,
+        SPRINT_COMPLETED
     }
 
     /**

@@ -23,6 +23,7 @@ public class ActivityLogResponse {
     private String projectName;
     private String entityType;
     private UUID entityId;
+    private String entityTitle;
     private String action;
     private String description;
     private String oldValue;
@@ -39,8 +40,9 @@ public class ActivityLogResponse {
                 .projectName(log.getProject() != null ? log.getProject().getName() : null)
                 .entityType(log.getEntityType() != null ? log.getEntityType().name() : null)
                 .entityId(log.getEntityId())
+                .entityTitle(log.getEntityTitle())
                 .action(log.getAction() != null ? log.getAction().name() : null)
-                .description(log.getActionDescription())
+                .description(log.getDescription())
                 .oldValue(log.getOldValue())
                 .newValue(log.getNewValue())
                 .createdAt(log.getCreatedAt())

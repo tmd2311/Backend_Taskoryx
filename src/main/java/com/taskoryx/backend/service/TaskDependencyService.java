@@ -1,6 +1,7 @@
 package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.dto.request.task.AddDependencyRequest;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.dto.response.task.TaskDependencyResponse;
 import com.taskoryx.backend.entity.Task;
@@ -9,6 +10,7 @@ import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.TaskDependencyRepository;
 import com.taskoryx.backend.repository.TaskRepository;
+import com.taskoryx.backend.repository.UserRepository;
 import com.taskoryx.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,7 +25,9 @@ public class TaskDependencyService {
 
     private final TaskDependencyRepository dependencyRepository;
     private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ActivityLogService activityLogService;
 
     @Transactional(readOnly = true)
     public List<TaskDependencyResponse> getDependencies(UUID taskId, UserPrincipal principal) {
@@ -72,7 +76,20 @@ public class TaskDependencyService {
                 .type(request.getType())
                 .build();
 
-        return TaskDependencyResponse.from(dependencyRepository.save(dependency));
+        TaskDependency saved = dependencyRepository.save(dependency);
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String addDepDesc = actor.getFullName() + " đã thêm liên kết " + dependency.getType().name()
+                + ": [" + task.getTaskKey() + "] " + task.getTitle()
+                + " → [" + dependsOnTask.getTaskKey() + "] " + dependsOnTask.getTitle();
+        activityLogService.logActivity(actor, task.getProject(),
+                ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.UPDATE,
+                task.getTaskKey() + " - " + task.getTitle(), addDepDesc,
+                null, "{\"dependencyType\":\"" + dependency.getType().name()
+                        + "\",\"dependsOnTaskKey\":\"" + dependsOnTask.getTaskKey()
+                        + "\",\"dependsOnTaskTitle\":\"" + dependsOnTask.getTitle() + "\"}");
+
+        return TaskDependencyResponse.from(saved);
     }
 
     @Transactional
@@ -87,6 +104,18 @@ public class TaskDependencyService {
         if (!dependency.getTask().getId().equals(taskId)) {
             throw new BadRequestException("Dependency không thuộc task này");
         }
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        Task dependsOnTask = dependency.getDependsOnTask();
+        String removeDepDesc = actor.getFullName() + " đã xóa liên kết " + dependency.getType().name()
+                + ": [" + task.getTaskKey() + "] " + task.getTitle()
+                + " → [" + dependsOnTask.getTaskKey() + "] " + dependsOnTask.getTitle();
+        activityLogService.logActivity(actor, task.getProject(),
+                ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.UPDATE,
+                task.getTaskKey() + " - " + task.getTitle(), removeDepDesc,
+                "{\"dependencyType\":\"" + dependency.getType().name()
+                        + "\",\"dependsOnTaskKey\":\"" + dependsOnTask.getTaskKey()
+                        + "\",\"dependsOnTaskTitle\":\"" + dependsOnTask.getTitle() + "\"}", null);
 
         dependencyRepository.delete(dependency);
     }

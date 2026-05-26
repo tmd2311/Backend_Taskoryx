@@ -21,17 +21,25 @@ public class ProjectMemberResponse {
     private String email;
     private String fullName;
     private String avatarUrl;
-    private String role;           // system role name (SUPER_ADMIN, PROJECT_MANAGER, ...)
+    private String role;             // tên role kỹ thuật lưu trong project_members (VD: "PROJECT_MANAGER")
+    private String roleDisplayName;  // tên hiển thị (VD: "Project Manager") — null nếu là custom role
     private String roleDescription;
     private LocalDateTime joinedAt;
 
     public static ProjectMemberResponse from(ProjectMember member) {
-        // Lấy system role từ UserRole (user chỉ có 1 role)
-        String roleName = member.getUser().getUserRoles().stream()
-                .map(ur -> ur.getRole().getName())
+        String memberRole = member.getRole(); // role lưu trực tiếp trong project_members
+
+        // Tìm displayName và description từ system role nếu tên khớp
+        String displayName = member.getUser().getUserRoles().stream()
+                .filter(ur -> ur.getRole() != null && memberRole != null
+                        && memberRole.equals(ur.getRole().getName()))
+                .map(ur -> ur.getRole().getDisplayName())
                 .findFirst()
-                .orElse(member.getRole());
+                .orElse(null);
+
         String roleDesc = member.getUser().getUserRoles().stream()
+                .filter(ur -> ur.getRole() != null && memberRole != null
+                        && memberRole.equals(ur.getRole().getName()))
                 .map(ur -> ur.getRole().getDescription())
                 .findFirst()
                 .orElse(null);
@@ -43,7 +51,8 @@ public class ProjectMemberResponse {
                 .email(member.getUser().getEmail())
                 .fullName(member.getUser().getFullName())
                 .avatarUrl(member.getUser().getAvatarUrl())
-                .role(roleName)
+                .role(memberRole)
+                .roleDisplayName(displayName)
                 .roleDescription(roleDesc)
                 .joinedAt(member.getJoinedAt())
                 .build();

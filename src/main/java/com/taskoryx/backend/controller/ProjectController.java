@@ -2,6 +2,7 @@ package com.taskoryx.backend.controller;
 
 import com.taskoryx.backend.dto.request.project.AddMemberRequest;
 import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
+import com.taskoryx.backend.dto.request.project.UpdateMemberRoleRequest;
 import com.taskoryx.backend.dto.request.project.UpdateProjectRequest;
 import com.taskoryx.backend.dto.response.ApiResponse;
 import com.taskoryx.backend.dto.response.comment.MentionedUserInfo;
@@ -121,6 +122,17 @@ public class ProjectController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Thêm thành viên thành công",
                         projectService.addMember(id, request, principal)));
+    }
+
+    @PatchMapping("/{id}/members/{userId}/role")
+    @Operation(summary = "Đổi role của thành viên trong dự án (Owner/Admin)")
+    public ResponseEntity<ApiResponse<ProjectMemberResponse>> updateMemberRole(
+            @PathVariable UUID id,
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateMemberRoleRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật vai trò thành công",
+                projectService.updateMemberRole(id, userId, request.getRole(), principal)));
     }
 
     @DeleteMapping("/{id}/members/{userId}")

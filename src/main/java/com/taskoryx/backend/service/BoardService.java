@@ -9,6 +9,7 @@ import com.taskoryx.backend.dto.response.board.BoardColumnResponse;
 import com.taskoryx.backend.dto.response.board.BoardResponse;
 import com.taskoryx.backend.dto.response.board.KanbanBoardResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
 import com.taskoryx.backend.entity.Task;
@@ -42,6 +43,7 @@ public class BoardService {
     private final SprintRepository sprintRepository;
     private final ProjectService projectService;
     private final ProjectAuthorizationService projectAuthorizationService;
+    private final ActivityLogService activityLogService;
 
     @Transactional(readOnly = true)
     public List<BoardResponse> getBoardsByProject(UUID projectId, UserPrincipal principal) {
@@ -135,6 +137,13 @@ public class BoardService {
             boardColumnRepository.save(doneColumn);
         }
 
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String createDesc = actor.getFullName() + " đã tạo board \"" + board.getName() + "\" trong dự án \"" + project.getName() + "\"";
+        activityLogService.logActivity(actor, project,
+                ActivityLog.EntityType.BOARD, board.getId(), ActivityLog.Action.CREATE,
+                board.getName(), createDesc,
+                null, "{\"boardName\":\"" + board.getName() + "\",\"boardType\":\"" + boardType.name() + "\"}");
+
         return toBoardResponse(board);
     }
 
@@ -147,7 +156,16 @@ public class BoardService {
 
         if (request.getName() != null) board.setName(request.getName());
         if (request.getDescription() != null) board.setDescription(request.getDescription());
-        return toBoardResponse(boardRepository.save(board));
+        Board saved = boardRepository.save(board);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String updateDesc = actor.getFullName() + " đã cập nhật board \"" + saved.getName() + "\"";
+        activityLogService.logActivity(actor, saved.getProject(),
+                ActivityLog.EntityType.BOARD, saved.getId(), ActivityLog.Action.UPDATE,
+                saved.getName(), updateDesc,
+                null, "{\"boardName\":\"" + saved.getName() + "\"}");
+
+        return toBoardResponse(saved);
     }
 
     @Transactional
@@ -159,6 +177,14 @@ public class BoardService {
         if (isSprintManagedBoard(board)) {
             throw new BadRequestException("Không thể xóa board sprint thủ công — board này được quản lí tự động theo sprint");
         }
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String deleteDesc = actor.getFullName() + " đã xóa board \"" + board.getName() + "\"";
+        activityLogService.logActivity(actor, board.getProject(),
+                ActivityLog.EntityType.BOARD, board.getId(), ActivityLog.Action.DELETE,
+                board.getName(), deleteDesc,
+                "{\"boardName\":\"" + board.getName() + "\"}", null);
+
         boardRepository.delete(board);
     }
 
@@ -187,7 +213,16 @@ public class BoardService {
                 .mappedStatus(request.getMappedStatus())
                 .position(maxPos != null ? maxPos + 1 : 0)
                 .build();
-        return BoardColumnResponse.from(boardColumnRepository.save(column));
+        BoardColumn savedColumn = boardColumnRepository.save(column);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String createColDesc = actor.getFullName() + " đã thêm cột \"" + savedColumn.getName() + "\" vào board \"" + board.getName() + "\"";
+        activityLogService.logActivity(actor, board.getProject(),
+                ActivityLog.EntityType.COLUMN, savedColumn.getId(), ActivityLog.Action.CREATE,
+                savedColumn.getName(), createColDesc,
+                null, "{\"columnName\":\"" + savedColumn.getName() + "\",\"boardName\":\"" + board.getName() + "\"}");
+
+        return BoardColumnResponse.from(savedColumn);
     }
 
     @Transactional
@@ -205,7 +240,16 @@ public class BoardService {
         if (request.getIsCompleted() != null) column.setIsCompleted(request.getIsCompleted());
         if (request.getTaskLimit() != null) column.setTaskLimit(request.getTaskLimit());
         if (request.getMappedStatus() != null) column.setMappedStatus(request.getMappedStatus());
-        return BoardColumnResponse.from(boardColumnRepository.save(column));
+        BoardColumn savedCol = boardColumnRepository.save(column);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String updateColDesc = actor.getFullName() + " đã cập nhật cột \"" + savedCol.getName() + "\" trên board \"" + savedCol.getBoard().getName() + "\"";
+        activityLogService.logActivity(actor, savedCol.getBoard().getProject(),
+                ActivityLog.EntityType.COLUMN, savedCol.getId(), ActivityLog.Action.UPDATE,
+                savedCol.getName(), updateColDesc,
+                null, "{\"columnName\":\"" + savedCol.getName() + "\",\"boardName\":\"" + savedCol.getBoard().getName() + "\"}");
+
+        return BoardColumnResponse.from(savedCol);
     }
 
     @Transactional
@@ -241,6 +285,14 @@ public class BoardService {
         if (isSprintManagedBoard(column.getBoard())) {
             throw new BadRequestException("Không thể xóa cột của board sprint");
         }
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String deleteColDesc = actor.getFullName() + " đã xóa cột \"" + column.getName() + "\" khỏi board \"" + column.getBoard().getName() + "\"";
+        activityLogService.logActivity(actor, column.getBoard().getProject(),
+                ActivityLog.EntityType.COLUMN, column.getId(), ActivityLog.Action.DELETE,
+                column.getName(), deleteColDesc,
+                "{\"columnName\":\"" + column.getName() + "\",\"boardName\":\"" + column.getBoard().getName() + "\"}", null);
+
         boardColumnRepository.delete(column);
     }
 

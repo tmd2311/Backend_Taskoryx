@@ -2,8 +2,10 @@ package com.taskoryx.backend.repository;
 
 import com.taskoryx.backend.entity.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +16,9 @@ public interface UserRoleRepository extends JpaRepository<UserRole, UUID> {
     List<UserRole> findByUserId(UUID userId);
     Optional<UserRole> findByUserIdAndRoleId(UUID userId, UUID roleId);
     boolean existsByUserIdAndRoleId(UUID userId, UUID roleId);
+
+    @Modifying
+    @Transactional
     void deleteByUserIdAndRoleId(UUID userId, UUID roleId);
 
     @Query("SELECT ur FROM UserRole ur JOIN FETCH ur.role r JOIN FETCH r.permissions WHERE ur.user.id = :userId")

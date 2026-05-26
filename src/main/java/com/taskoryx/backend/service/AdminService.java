@@ -284,16 +284,15 @@ public class AdminService {
 
     @Transactional
     public AdminUserResponse removeRoleFromUser(UUID userId, UUID roleId) {
-        findUserById(userId);
-        findRoleById(roleId);
+        UserRole userRole = userRoleRepository.findByUserIdAndRoleId(userId, roleId)
+                .orElseThrow(() -> new BadRequestException("User không có role này"));
 
-        if (!userRoleRepository.existsByUserIdAndRoleId(userId, roleId)) {
-            throw new BadRequestException("User không có role này");
-        }
+        userRoleRepository.delete(userRole);
+        userRoleRepository.flush();
 
-        userRoleRepository.deleteByUserIdAndRoleId(userId, roleId);
-
-        User updatedUser = findUserById(userId);
+        User updatedUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        updatedUser.getUserRoles().removeIf(ur -> ur.getId().equals(userRole.getId()));
         return AdminUserResponse.from(updatedUser);
     }
 

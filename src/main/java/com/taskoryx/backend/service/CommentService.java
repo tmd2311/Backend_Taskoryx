@@ -90,9 +90,15 @@ public class CommentService {
                 task.getAssignee() != null ? task.getAssignee().getId() : null,
                 task.getReporter().getId());
 
+        String commentDesc = author.getFullName() + " đã thêm bình luận vào task ["
+                + task.getTaskKey() + "] " + task.getTitle();
+        String preview = request.getContent().length() > 100
+                ? request.getContent().substring(0, 100) + "..." : request.getContent();
         activityLogService.logActivity(author, task.getProject(),
-                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.CREATE,
-                null, "{\"taskId\":\"" + task.getId() + "\",\"taskKey\":\"" + task.getTaskKey() + "\"}");
+                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.COMMENT_ADDED,
+                task.getTaskKey() + " - " + task.getTitle(), commentDesc,
+                null, "{\"taskId\":\"" + task.getId() + "\",\"taskKey\":\"" + task.getTaskKey()
+                        + "\",\"preview\":\"" + preview.replace("\"", "'") + "\"}");
 
         return CommentResponse.from(comment);
     }
@@ -117,9 +123,13 @@ public class CommentService {
         comment = commentRepository.save(comment);
         processMentions(comment, comment.getTask(), comment.getUser());
 
-        activityLogService.logActivity(comment.getUser(), comment.getTask().getProject(),
-                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.UPDATE,
-                null, "{\"taskId\":\"" + comment.getTask().getId() + "\"}");
+        Task updatedTask = comment.getTask();
+        String editDesc = comment.getUser().getFullName() + " đã sửa bình luận trong task ["
+                + updatedTask.getTaskKey() + "] " + updatedTask.getTitle();
+        activityLogService.logActivity(comment.getUser(), updatedTask.getProject(),
+                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.COMMENT_UPDATED,
+                updatedTask.getTaskKey() + " - " + updatedTask.getTitle(), editDesc,
+                null, "{\"taskId\":\"" + updatedTask.getId() + "\",\"taskKey\":\"" + updatedTask.getTaskKey() + "\"}");
 
         return CommentResponse.from(commentRepository.save(comment));
     }
@@ -136,9 +146,13 @@ public class CommentService {
         }
 
         User actor = userRepository.findById(principal.getId()).orElseThrow();
-        activityLogService.logActivity(actor, comment.getTask().getProject(),
-                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.DELETE,
-                "{\"taskId\":\"" + comment.getTask().getId() + "\"}", null);
+        Task deletedCommentTask = comment.getTask();
+        String deleteCommentDesc = actor.getFullName() + " đã xóa bình luận trong task ["
+                + deletedCommentTask.getTaskKey() + "] " + deletedCommentTask.getTitle();
+        activityLogService.logActivity(actor, deletedCommentTask.getProject(),
+                ActivityLog.EntityType.COMMENT, comment.getId(), ActivityLog.Action.COMMENT_DELETED,
+                deletedCommentTask.getTaskKey() + " - " + deletedCommentTask.getTitle(), deleteCommentDesc,
+                "{\"taskId\":\"" + deletedCommentTask.getId() + "\",\"taskKey\":\"" + deletedCommentTask.getTaskKey() + "\"}", null);
 
         commentRepository.delete(comment);
     }

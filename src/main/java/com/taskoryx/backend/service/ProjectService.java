@@ -99,8 +99,10 @@ public class ProjectService {
         // Tạo board mặc định
         createDefaultBoard(project);
 
+        String createDesc = owner.getFullName() + " đã tạo dự án \"" + project.getName() + "\" (mã: " + project.getKey() + ")";
         activityLogService.logActivity(owner, project,
                 ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.CREATE,
+                project.getName(), createDesc,
                 null, "{\"name\":\"" + project.getName() + "\",\"key\":\"" + project.getKey() + "\"}");
 
         ProjectResponse response = ProjectResponse.from(project);
@@ -135,8 +137,10 @@ public class ProjectService {
 
         Project saved = projectRepository.save(project);
         User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String updateDesc = actor.getFullName() + " đã cập nhật thông tin dự án \"" + saved.getName() + "\"";
         activityLogService.logActivity(actor, saved,
                 ActivityLog.EntityType.PROJECT, saved.getId(), ActivityLog.Action.UPDATE,
+                saved.getName(), updateDesc,
                 null, "{\"name\":\"" + saved.getName() + "\"}");
         return ProjectResponse.from(saved);
     }
@@ -216,12 +220,19 @@ public class ProjectService {
                 .user(newMember)
                 .role(projectRole)
                 .build();
-        ProjectMemberResponse response = ProjectMemberResponse.from(projectMemberRepository.save(member));
+        ProjectMember savedMember = projectMemberRepository.save(member);
+        // Reload để đảm bảo lazy collection getUserRoles() được load đầy đủ
+        savedMember = projectMemberRepository.findById(savedMember.getId()).orElse(savedMember);
+        ProjectMemberResponse response = ProjectMemberResponse.from(savedMember);
 
         User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String addMemberDesc = actor.getFullName() + " đã thêm thành viên " + newMember.getFullName()
+                + " (" + newMember.getEmail() + ") vào dự án \"" + project.getName() + "\"";
         activityLogService.logActivity(actor, project,
-                ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.UPDATE,
-                null, "{\"action\":\"ADD_MEMBER\",\"userId\":\"" + newMember.getId() + "\",\"email\":\"" + newMember.getEmail() + "\"}");
+                ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.MEMBER_ADDED,
+                project.getName(), addMemberDesc,
+                null, "{\"userId\":\"" + newMember.getId() + "\",\"fullName\":\"" + newMember.getFullName()
+                        + "\",\"email\":\"" + newMember.getEmail() + "\",\"role\":\"" + projectRole + "\"}");
 
         return response;
     }
@@ -235,11 +246,46 @@ public class ProjectService {
             throw new ForbiddenException("Không thể xóa chủ sở hữu khỏi dự án");
         }
         Project project = member.getProject();
+        User removedUser = member.getUser();
         User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String removeMemberDesc = actor.getFullName() + " đã xóa thành viên " + removedUser.getFullName()
+                + " (" + removedUser.getEmail() + ") khỏi dự án \"" + project.getName() + "\"";
+        activityLogService.logActivity(actor, project,
+                ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.MEMBER_REMOVED,
+                project.getName(), removeMemberDesc,
+                "{\"userId\":\"" + userId + "\",\"fullName\":\"" + removedUser.getFullName()
+                        + "\",\"email\":\"" + removedUser.getEmail() + "\"}", null);
+        projectMemberRepository.delete(member);
+    }
+
+    @Transactional
+    public ProjectMemberResponse updateMemberRole(UUID projectId, UUID userId,
+                                                   String newRole, UserPrincipal principal) {
+        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.MEMBER_MANAGE);
+        ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong dự án"));
+        if ("OWNER".equals(member.getRole())) {
+            throw new ForbiddenException("Không thể thay đổi role của chủ sở hữu dự án");
+        }
+
+        String oldRole = member.getRole();
+        member.setRole(newRole);
+        ProjectMember saved = projectMemberRepository.save(member);
+        saved = projectMemberRepository.findById(saved.getId()).orElse(saved);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        User targetUser = member.getUser();
+        Project project = member.getProject();
+        String desc = actor.getFullName() + " đã đổi role của " + targetUser.getFullName()
+                + " từ \"" + oldRole + "\" → \"" + newRole + "\" trong dự án \"" + project.getName() + "\"";
         activityLogService.logActivity(actor, project,
                 ActivityLog.EntityType.PROJECT, project.getId(), ActivityLog.Action.UPDATE,
-                "{\"action\":\"REMOVE_MEMBER\",\"userId\":\"" + userId + "\"}", null);
-        projectMemberRepository.delete(member);
+                project.getName(), desc,
+                "{\"userId\":\"" + userId + "\",\"role\":\"" + oldRole + "\"}",
+                "{\"userId\":\"" + userId + "\",\"fullName\":\"" + targetUser.getFullName()
+                        + "\",\"role\":\"" + newRole + "\"}");
+
+        return ProjectMemberResponse.from(saved);
     }
 
     // ========== HELPERS ==========

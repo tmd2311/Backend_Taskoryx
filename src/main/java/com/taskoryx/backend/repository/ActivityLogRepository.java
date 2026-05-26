@@ -21,6 +21,34 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, UUID> 
     List<ActivityLog> findByEntityTypeAndEntityIdOrderByCreatedAtDesc(
             ActivityLog.EntityType entityType, UUID entityId);
 
+    /**
+     * Lấy toàn bộ activity liên quan đến một task:
+     * - Hành động trực tiếp trên task (entityType=TASK, entityId=taskId)
+     * - Comment/Attachment thuộc task này (entityType=COMMENT/ATTACHMENT, lưu taskId trong newValue/oldValue)
+     *   → dùng entityTitle chứa taskKey để join, hoặc dùng project + description LIKE
+     * Cách đơn giản nhất: lưu taskId vào một cột riêng khi log comment — nhưng hiện tại
+     * dùng JPQL lấy tất cả log trong project có entityId = taskId HOẶC description chứa taskKey.
+     * Thực tế gọn hơn: thêm cột task_id nullable vào activity_logs.
+     *
+     * Tạm thời: query theo project + (entityType=TASK,entityId=taskId) OR (entityType IN (COMMENT,ATTACHMENT) AND newValue/oldValue chứa taskId)
+     */
+    @Query("""
+            SELECT a FROM ActivityLog a
+            WHERE a.project.id = :projectId
+              AND (
+                (a.entityType = 'TASK' AND a.entityId = :taskId)
+                OR (a.entityType IN ('COMMENT', 'ATTACHMENT') AND (
+                    a.newValue LIKE %:taskIdStr%
+                    OR a.oldValue LIKE %:taskIdStr%
+                ))
+              )
+            ORDER BY a.createdAt DESC
+            """)
+    List<ActivityLog> findAllByTaskId(
+            @Param("projectId") UUID projectId,
+            @Param("taskId") UUID taskId,
+            @Param("taskIdStr") String taskIdStr);
+
     @Query("SELECT COUNT(a) FROM ActivityLog a WHERE a.user.id = :userId AND a.project.id = :projectId")
     long countByUserIdAndProjectId(@Param("userId") UUID userId, @Param("projectId") UUID projectId);
 

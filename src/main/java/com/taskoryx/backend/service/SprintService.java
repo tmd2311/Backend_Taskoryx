@@ -82,6 +82,14 @@ public class SprintService {
                 .build();
 
         sprint = sprintRepository.save(sprint);
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String createDesc = actor.getFullName() + " đã tạo sprint \"" + sprint.getName() + "\"";
+        activityLogService.logActivity(actor, project,
+                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.CREATE,
+                sprint.getName(), createDesc,
+                null, "{\"sprintName\":\"" + sprint.getName() + "\",\"status\":\"PLANNED\"}");
+
         return SprintResponse.fromWithTasks(sprint, List.of());
     }
 
@@ -177,6 +185,14 @@ public class SprintService {
         if (request.getEndDate()   != null) sprint.setEndDate(request.getEndDate());
 
         sprint = sprintRepository.save(sprint);
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String updateDesc = actor.getFullName() + " đã cập nhật sprint \"" + sprint.getName() + "\"";
+        activityLogService.logActivity(actor, sprint.getProject(),
+                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.UPDATE,
+                sprint.getName(), updateDesc,
+                null, "{\"sprintName\":\"" + sprint.getName() + "\"}");
+
         return SprintResponse.fromWithTasks(sprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
 
@@ -204,8 +220,10 @@ public class SprintService {
         sprint = sprintRepository.save(sprint);
 
         var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String startSprintDesc = actor.getFullName() + " đã bắt đầu sprint \"" + sprint.getName() + "\"";
         activityLogService.logActivity(actor, sprint.getProject(),
-                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.UPDATE,
+                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.SPRINT_STARTED,
+                sprint.getName(), startSprintDesc,
                 "{\"status\":\"PLANNED\"}",
                 "{\"status\":\"ACTIVE\",\"sprintName\":\"" + sprint.getName() + "\"}");
 
@@ -230,8 +248,10 @@ public class SprintService {
         sprint = sprintRepository.save(sprint);
 
         var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String completeSprintDesc = actor.getFullName() + " đã hoàn thành sprint \"" + sprint.getName() + "\"";
         activityLogService.logActivity(actor, sprint.getProject(),
-                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.COMPLETE,
+                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.SPRINT_COMPLETED,
+                sprint.getName(), completeSprintDesc,
                 "{\"status\":\"ACTIVE\"}",
                 "{\"status\":\"COMPLETED\",\"sprintName\":\"" + sprint.getName() + "\"}");
 
@@ -249,6 +269,13 @@ public class SprintService {
         if (sprint.getStatus() != Sprint.SprintStatus.PLANNED) {
             throw new BadRequestException("Chỉ có thể xóa sprint đang ở trạng thái PLANNED");
         }
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String deleteDesc = actor.getFullName() + " đã xóa sprint \"" + sprint.getName() + "\"";
+        activityLogService.logActivity(actor, sprint.getProject(),
+                ActivityLog.EntityType.PROJECT, sprint.getId(), ActivityLog.Action.DELETE,
+                sprint.getName(), deleteDesc,
+                "{\"sprintName\":\"" + sprint.getName() + "\"}", null);
 
         // Xóa sprint board đi kèm
         Board board = sprint.getBoard();
@@ -282,6 +309,15 @@ public class SprintService {
         task.setSprint(sprint);
         attachTaskToSprintBoard(sprint, task);
         taskRepository.save(task);
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String addTaskDesc = actor.getFullName() + " đã thêm task [" + task.getTaskKey() + "] "
+                + task.getTitle() + " vào sprint \"" + sprint.getName() + "\"";
+        activityLogService.logActivity(actor, sprint.getProject(),
+                ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.UPDATE,
+                task.getTaskKey() + " - " + task.getTitle(), addTaskDesc,
+                null, "{\"sprintId\":\"" + sprint.getId() + "\",\"sprintName\":\"" + sprint.getName() + "\"}");
+
         Sprint refreshedSprint = findSprintById(sprintId);
         return SprintResponse.fromWithTasks(refreshedSprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }
@@ -301,6 +337,15 @@ public class SprintService {
         task.setSprint(null);
         detachTaskFromSprintBoard(sprint, task);
         taskRepository.save(task);
+
+        var actor = userRepository.findById(principal.getId()).orElseThrow();
+        String removeTaskDesc = actor.getFullName() + " đã xóa task [" + task.getTaskKey() + "] "
+                + task.getTitle() + " khỏi sprint \"" + sprint.getName() + "\"";
+        activityLogService.logActivity(actor, sprint.getProject(),
+                ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.UPDATE,
+                task.getTaskKey() + " - " + task.getTitle(), removeTaskDesc,
+                "{\"sprintId\":\"" + sprint.getId() + "\",\"sprintName\":\"" + sprint.getName() + "\"}", null);
+
         Sprint refreshedSprint = findSprintById(sprintId);
         return SprintResponse.fromWithTasks(refreshedSprint, taskRepository.findBySprintIdOrderByCreatedAtAsc(sprintId));
     }

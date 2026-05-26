@@ -3,6 +3,7 @@ package com.taskoryx.backend.service;
 import com.taskoryx.backend.dto.request.category.CreateCategoryRequest;
 import com.taskoryx.backend.dto.request.category.UpdateCategoryRequest;
 import com.taskoryx.backend.dto.response.category.CategoryResponse;
+import com.taskoryx.backend.entity.ActivityLog;
 import com.taskoryx.backend.entity.IssueCategory;
 import com.taskoryx.backend.entity.Project;
 import com.taskoryx.backend.entity.ProjectPermission;
@@ -28,6 +29,7 @@ public class IssueCategoryService {
     private final ProjectService projectService;
     private final ProjectAuthorizationService projectAuthorizationService;
     private final UserRepository userRepository;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public CategoryResponse createCategory(UUID projectId, CreateCategoryRequest request, UserPrincipal principal) {
@@ -49,8 +51,16 @@ public class IssueCategoryService {
                 .name(request.getName())
                 .defaultAssignee(defaultAssignee)
                 .build();
+        IssueCategory saved = categoryRepository.save(category);
 
-        return CategoryResponse.from(categoryRepository.save(category));
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String createDesc = actor.getFullName() + " đã tạo danh mục \"" + saved.getName() + "\" trong dự án \"" + project.getName() + "\"";
+        activityLogService.logActivity(actor, project,
+                ActivityLog.EntityType.PROJECT, saved.getId(), ActivityLog.Action.CREATE,
+                saved.getName(), createDesc,
+                null, "{\"categoryName\":\"" + saved.getName() + "\"}");
+
+        return CategoryResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -83,7 +93,16 @@ public class IssueCategoryService {
             category.setDefaultAssignee(assignee);
         }
 
-        return CategoryResponse.from(categoryRepository.save(category));
+        IssueCategory updatedCategory = categoryRepository.save(category);
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String updateDesc = actor.getFullName() + " đã cập nhật danh mục \"" + updatedCategory.getName() + "\"";
+        activityLogService.logActivity(actor, updatedCategory.getProject(),
+                ActivityLog.EntityType.PROJECT, updatedCategory.getId(), ActivityLog.Action.UPDATE,
+                updatedCategory.getName(), updateDesc,
+                null, "{\"categoryName\":\"" + updatedCategory.getName() + "\"}");
+
+        return CategoryResponse.from(updatedCategory);
     }
 
     @Transactional
@@ -95,6 +114,14 @@ public class IssueCategoryService {
         if (!category.getTasks().isEmpty()) {
             throw new BadRequestException("Không thể xóa danh mục đang có task. Hãy gỡ task khỏi danh mục trước.");
         }
+
+        User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String deleteDesc = actor.getFullName() + " đã xóa danh mục \"" + category.getName() + "\" khỏi dự án \"" + category.getProject().getName() + "\"";
+        activityLogService.logActivity(actor, category.getProject(),
+                ActivityLog.EntityType.PROJECT, category.getId(), ActivityLog.Action.DELETE,
+                category.getName(), deleteDesc,
+                "{\"categoryName\":\"" + category.getName() + "\"}", null);
+
         categoryRepository.delete(category);
     }
 

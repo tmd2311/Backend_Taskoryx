@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -47,30 +48,40 @@ public class ActivityLogService {
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_VIEW);
         return activityLogRepository
-                .findByEntityTypeAndEntityIdOrderByCreatedAtDesc(ActivityLog.EntityType.TASK, taskId)
+                .findAllByTaskId(task.getProject().getId(), taskId, taskId.toString())
                 .stream()
                 .map(ActivityLogResponse::from)
                 .collect(Collectors.toList());
     }
 
     @Async
-    @Transactional
     public void logActivity(User user, Project project, ActivityLog.EntityType entityType,
                              UUID entityId, ActivityLog.Action action,
+                             String entityTitle, String description,
                              String oldValue, String newValue) {
         try {
-            ActivityLog activityLog = ActivityLog.builder()
-                    .user(user)
-                    .project(project)
-                    .entityType(entityType)
-                    .entityId(entityId)
-                    .action(action)
-                    .oldValue(oldValue)
-                    .newValue(newValue)
-                    .build();
-            activityLogRepository.save(activityLog);
+            doSaveLog(user, project, entityType, entityId, action, entityTitle, description, oldValue, newValue);
         } catch (Exception e) {
             log.error("Lỗi khi ghi activity log: {}", e.getMessage(), e);
         }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void doSaveLog(User user, Project project, ActivityLog.EntityType entityType,
+                          UUID entityId, ActivityLog.Action action,
+                          String entityTitle, String description,
+                          String oldValue, String newValue) {
+        ActivityLog activityLog = ActivityLog.builder()
+                .user(user)
+                .project(project)
+                .entityType(entityType)
+                .entityId(entityId)
+                .action(action)
+                .entityTitle(entityTitle)
+                .description(description)
+                .oldValue(oldValue)
+                .newValue(newValue)
+                .build();
+        activityLogRepository.save(activityLog);
     }
 }

@@ -136,9 +136,15 @@ public class TaskService {
                     task.getId(), task.getTitle(), project.getName());
         }
 
+        String createDesc = reporter.getFullName() + " đã tạo task [" + task.getTaskKey() + "] " + task.getTitle();
         activityLogService.logActivity(reporter, project,
                 ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.CREATE,
-                null, "{\"taskKey\":\"" + task.getTaskKey() + "\",\"title\":\"" + task.getTitle() + "\"}");
+                task.getTaskKey() + " - " + task.getTitle(), createDesc,
+                null, "{\"taskKey\":\"" + task.getTaskKey() + "\",\"title\":\"" + task.getTitle()
+                        + "\",\"status\":\"" + task.getStatus().name()
+                        + "\",\"priority\":\"" + task.getPriority().name()
+                        + (task.getAssignee() != null ? "\",\"assigneeName\":\"" + task.getAssignee().getFullName() : "")
+                        + "\"}");
 
         return TaskResponse.from(taskRepository.findById(task.getId()).orElseThrow());
     }
@@ -278,14 +284,24 @@ public class TaskService {
 
         // Log ASSIGN riêng nếu assignee thay đổi — quan trọng cho performance scoring
         if (assigneeChanged && newAssigneeUser != null) {
-            String oldVal = oldAssigneeId != null ? "{\"assigneeId\":\"" + oldAssigneeId + "\"}" : null;
+            String oldAssigneeName = oldAssigneeId != null
+                    ? userRepository.findById(oldAssigneeId).map(User::getFullName).orElse("Không có")
+                    : "Không có";
+            String assignDesc = actor.getFullName() + " đã chuyển giao task [" + saved.getTaskKey() + "] "
+                    + saved.getTitle() + " từ " + oldAssigneeName + " → " + newAssigneeUser.getFullName();
+            String oldAssignVal = "{\"assigneeId\":\"" + (oldAssigneeId != null ? oldAssigneeId : "") + "\","
+                    + "\"assigneeName\":\"" + oldAssigneeName + "\"}";
             activityLogService.logActivity(actor, saved.getProject(),
                     ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.ASSIGN,
-                    oldVal, "{\"assigneeId\":\"" + newAssigneeUser.getId() + "\",\"assigneeName\":\"" + newAssigneeUser.getFullName() + "\"}");
+                    saved.getTaskKey() + " - " + saved.getTitle(), assignDesc,
+                    oldAssignVal, "{\"assigneeId\":\"" + newAssigneeUser.getId()
+                            + "\",\"assigneeName\":\"" + newAssigneeUser.getFullName() + "\"}");
         }
 
+        String updateDesc = actor.getFullName() + " đã cập nhật task [" + saved.getTaskKey() + "] " + saved.getTitle();
         activityLogService.logActivity(actor, saved.getProject(),
                 ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.UPDATE,
+                saved.getTaskKey() + " - " + saved.getTitle(), updateDesc,
                 null, "{\"taskKey\":\"" + saved.getTaskKey() + "\",\"title\":\"" + saved.getTitle() + "\"}");
 
         return TaskResponse.from(saved);
@@ -340,9 +356,13 @@ public class TaskService {
         Task saved = taskRepository.save(task);
 
         User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String moveDesc = actor.getFullName() + " đã chuyển task [" + saved.getTaskKey() + "] "
+                + saved.getTitle() + " sang cột \"" + targetColumn.getName() + "\"";
         activityLogService.logActivity(actor, saved.getProject(),
                 ActivityLog.EntityType.TASK, saved.getId(), ActivityLog.Action.MOVE,
-                null, "{\"columnId\":\"" + targetColumn.getId() + "\",\"columnName\":\"" + targetColumn.getName() + "\"}");
+                saved.getTaskKey() + " - " + saved.getTitle(), moveDesc,
+                null, "{\"columnId\":\"" + targetColumn.getId()
+                        + "\",\"columnName\":\"" + targetColumn.getName() + "\"}");
 
         return TaskResponse.from(saved);
     }
@@ -355,8 +375,10 @@ public class TaskService {
                 ProjectPermission.TASK_DELETE);
 
         User actor = userRepository.findById(principal.getId()).orElseThrow();
+        String deleteDesc = actor.getFullName() + " đã xóa task [" + task.getTaskKey() + "] " + task.getTitle();
         activityLogService.logActivity(actor, task.getProject(),
                 ActivityLog.EntityType.TASK, task.getId(), ActivityLog.Action.DELETE,
+                task.getTaskKey() + " - " + task.getTitle(), deleteDesc,
                 "{\"taskKey\":\"" + task.getTaskKey() + "\",\"title\":\"" + task.getTitle() + "\"}", null);
 
         taskRepository.delete(task);
@@ -383,9 +405,12 @@ public class TaskService {
         User actor = userRepository.findById(principal.getId()).orElseThrow();
         boolean isCompleted = saved.getStatus() == Task.TaskStatus.DONE
                 || saved.getStatus() == Task.TaskStatus.RESOLVED;
-        ActivityLog.Action logAction = isCompleted ? ActivityLog.Action.COMPLETE : ActivityLog.Action.UPDATE;
+        ActivityLog.Action logAction = isCompleted ? ActivityLog.Action.COMPLETE : ActivityLog.Action.STATUS_CHANGE;
+        String statusDesc = actor.getFullName() + " đã đổi trạng thái task [" + saved.getTaskKey() + "] "
+                + saved.getTitle() + " từ " + oldStatus + " → " + saved.getStatus().name();
         activityLogService.logActivity(actor, saved.getProject(),
                 ActivityLog.EntityType.TASK, saved.getId(), logAction,
+                saved.getTaskKey() + " - " + saved.getTitle(), statusDesc,
                 "{\"status\":\"" + oldStatus + "\"}",
                 "{\"status\":\"" + saved.getStatus().name() + "\"}");
 
