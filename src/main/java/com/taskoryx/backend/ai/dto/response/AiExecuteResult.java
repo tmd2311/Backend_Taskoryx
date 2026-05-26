@@ -13,6 +13,7 @@ public class AiExecuteResult {
     private String projectKey;
     private String projectName;
 
+    private int sprintsCreated;
     private int tasksCreated;
     private int subTasksCreated;
 }

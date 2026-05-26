@@ -45,6 +45,19 @@ public class WebSocketNotificationService {
         sendToProject(projectId, eventType, taskData);
     }
 
+    // Send AI plan ready event to specific user
+    public void sendAiPlanReady(UUID userId, UUID sessionId) {
+        try {
+            messagingTemplate.convertAndSendToUser(
+                userId.toString(),
+                "/queue/ai-plan-ready",
+                new WebSocketEvent("AI_PLAN_READY", java.util.Map.of("sessionId", sessionId.toString()))
+            );
+        } catch (Exception e) {
+            log.error("Failed to send AI plan ready event to user {}", userId, e);
+        }
+    }
+
     // Inner class for WebSocket events
     @lombok.Data
     @lombok.AllArgsConstructor

@@ -43,6 +43,9 @@ public class GeminiChatService implements AiChatService {
     private static final String GEMINI_API_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
 
+    private static final int MAX_RETRIES = 3;
+    private static final long[] RETRY_DELAYS_MS = {3_000, 8_000, 15_000};
+
     @Override
     public String chat(String systemPrompt, String userMessage) {
         String url = GEMINI_API_URL.formatted(model, apiKey);
@@ -62,19 +65,42 @@ public class GeminiChatService implements AiChatService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        try {
-            String rawBody = objectMapper.writeValueAsString(body);
-            HttpEntity<String> entity = new HttpEntity<>(rawBody, headers);
-            String response = restTemplate.postForObject(url, entity, String.class);
+        Exception lastException = null;
+        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                if (attempt > 0) {
+                    log.warn("Gemini retry attempt {}/{}, waiting {}ms", attempt, MAX_RETRIES - 1, RETRY_DELAYS_MS[attempt - 1]);
+                    Thread.sleep(RETRY_DELAYS_MS[attempt - 1]);
+                }
 
-            JsonNode root = objectMapper.readTree(response);
-            return root.path("candidates").get(0)
-                    .path("content").path("parts").get(0)
-                    .path("text").asText();
-        } catch (Exception e) {
-            log.error("Gemini API call failed: {}", e.getMessage());
-            throw new BadRequestException("Không thể kết nối AI. Vui lòng thử lại sau.");
+                String rawBody = objectMapper.writeValueAsString(body);
+                HttpEntity<String> entity = new HttpEntity<>(rawBody, headers);
+                String response = restTemplate.postForObject(url, entity, String.class);
+
+                JsonNode root = objectMapper.readTree(response);
+                return root.path("candidates").get(0)
+                        .path("content").path("parts").get(0)
+                        .path("text").asText();
+
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new BadRequestException("Không thể kết nối AI. Vui lòng thử lại sau.");
+            } catch (Exception e) {
+                lastException = e;
+                boolean isRetryable = e.getMessage() != null &&
+                        (e.getMessage().contains("503") || e.getMessage().contains("429") ||
+                         e.getMessage().contains("UNAVAILABLE") || e.getMessage().contains("overloaded"));
+                if (!isRetryable) {
+                    log.error("Gemini API call failed (non-retryable): {}", e.getMessage());
+                    throw new BadRequestException("Không thể kết nối AI. Vui lòng thử lại sau.");
+                }
+                log.warn("Gemini API call failed (retryable, attempt {}/{}): {}", attempt + 1, MAX_RETRIES, e.getMessage());
+            }
         }
+
+        log.error("Gemini API call failed after {} retries: {}", MAX_RETRIES,
+                lastException != null ? lastException.getMessage() : "unknown");
+        throw new BadRequestException("AI đang quá tải. Vui lòng thử lại sau ít phút.");
     }
 
     @Override

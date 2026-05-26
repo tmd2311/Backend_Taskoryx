@@ -24,5 +24,6 @@ public class AiProjectPlan {
     @JsonProperty("total_duration_days")
     private Integer totalDurationDays;
 
-    private List<AiTaskItem> tasks;
+    /** Danh sách sprint với tasks phân bổ sẵn. */
+    private List<AiSprintItem> sprints;
 }
