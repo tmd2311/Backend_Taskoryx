@@ -145,4 +145,36 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
                    "ORDER BY t.task_number ASC",
            nativeQuery = true)
     List<Task> findValidParentCandidates(@Param("projectId") UUID projectId);
+
+    // Gantt: tất cả task của project, eager-load các quan hệ cần cho Gantt trong 1 query
+    @Query("""
+        SELECT DISTINCT t FROM Task t
+        LEFT JOIN FETCH t.assignee
+        LEFT JOIN FETCH t.sprint
+        LEFT JOIN FETCH t.parentTask
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH t.dependencies d
+        LEFT JOIN FETCH d.dependsOnTask
+        WHERE t.project.id = :projectId
+        AND t.status != 'CANCELLED'
+        ORDER BY t.taskNumber ASC
+        """)
+    List<Task> findForGantt(@Param("projectId") UUID projectId);
+
+    // Gantt filter theo sprint
+    @Query("""
+        SELECT DISTINCT t FROM Task t
+        LEFT JOIN FETCH t.assignee
+        LEFT JOIN FETCH t.sprint
+        LEFT JOIN FETCH t.parentTask
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH t.dependencies d
+        LEFT JOIN FETCH d.dependsOnTask
+        WHERE t.project.id = :projectId
+        AND t.sprint.id = :sprintId
+        AND t.status != 'CANCELLED'
+        ORDER BY t.taskNumber ASC
+        """)
+    List<Task> findForGanttBySprint(@Param("projectId") UUID projectId,
+                                    @Param("sprintId") UUID sprintId);
 }
