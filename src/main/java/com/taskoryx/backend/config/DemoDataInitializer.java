@@ -75,12 +75,12 @@ public class DemoDataInitializer implements ApplicationRunner {
         Role roleMember         = findRole("MEMBER");
 
         // ── 1. Users ──────────────────────────────────────────────────────────
-        User admin  = upsertUser("admin",           "Trần Quốc Admin",    "admin@techvision.vn",        false);
-        User an     = upsertUser("nguyen.van.an",   "Nguyễn Văn An",      "an.nguyen@techvision.vn",    false);
-        User bich   = upsertUser("tran.thi.bich",   "Trần Thị Bích",      "bich.tran@techvision.vn",    false);
-        User duc    = upsertUser("le.minh.duc",     "Lê Minh Đức",        "duc.le@techvision.vn",       false);
-        User huong  = upsertUser("pham.thi.huong",  "Phạm Thị Hương",     "huong.pham@techvision.vn",   false);
-        User kiet   = upsertUser("hoang.van.kiet",  "Hoàng Văn Kiệt",     "kiet.hoang@techvision.vn",   false);
+        User admin  = upsertUser("demo_admin",        "Trần Quốc Admin",    "admin@techvision.vn",        false);
+        User an     = upsertUser("nguyen_van_an",   "Nguyễn Văn An",      "an.nguyen@techvision.vn",    false);
+        User bich   = upsertUser("tran_thi_bich",   "Trần Thị Bích",      "bich.tran@techvision.vn",    false);
+        User duc    = upsertUser("le_minh_duc",     "Lê Minh Đức",        "duc.le@techvision.vn",       false);
+        User huong  = upsertUser("pham_thi_huong",  "Phạm Thị Hương",     "huong.pham@techvision.vn",   false);
+        User kiet   = upsertUser("hoang_van_kiet",  "Hoàng Văn Kiệt",     "kiet.hoang@techvision.vn",   false);
 
         // ── 2. System roles ───────────────────────────────────────────────────
         grantSystemRole(admin, roleSuperAdmin);
@@ -518,16 +518,19 @@ public class DemoDataInitializer implements ApplicationRunner {
     }
 
     private User upsertUser(String username, String fullName, String email, boolean mustChange) {
-        return userRepository.findByEmail(email).orElseGet(() ->
-                userRepository.save(User.builder()
-                        .username(username)
-                        .email(email)
-                        .passwordHash(passwordEncoder.encode(DEMO_PASSWORD))
-                        .fullName(fullName)
-                        .isActive(true)
-                        .emailVerified(true)
-                        .mustChangePassword(mustChange)
-                        .build()));
+        Optional<User> byEmail = userRepository.findByEmail(email);
+        if (byEmail.isPresent()) return byEmail.get();
+        Optional<User> byUsername = userRepository.findByUsername(username);
+        if (byUsername.isPresent()) return byUsername.get();
+        return userRepository.save(User.builder()
+                .username(username)
+                .email(email)
+                .passwordHash(passwordEncoder.encode(DEMO_PASSWORD))
+                .fullName(fullName)
+                .isActive(true)
+                .emailVerified(true)
+                .mustChangePassword(mustChange)
+                .build());
     }
 
     private void grantSystemRole(User user, Role role) {
