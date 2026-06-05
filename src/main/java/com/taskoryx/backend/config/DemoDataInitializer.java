@@ -2,7 +2,6 @@ package com.taskoryx.backend.config;
 
 import com.taskoryx.backend.entity.*;
 import com.taskoryx.backend.repository.*;
-import com.taskoryx.backend.repository.TaskLabelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -18,15 +17,20 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Tạo dữ liệu demo khi app khởi động lần đầu (chỉ chạy khi chưa có project nào).
- * Chạy sau DataInitializer (@Order 1) nên đảm bảo roles/permissions đã sẵn sàng.
+ * Tạo dữ liệu demo khi app khởi động lần đầu (bỏ qua nếu đã có project).
+ * Chạy sau DataInitializer (@Order 1) để đảm bảo roles/permissions sẵn sàng.
  *
- * Kịch bản: Dự án "Nền tảng thương mại điện tử" (key: TMDT)
- *   admin  → SUPER_ADMIN (system) + OWNER (project)
- *   nam    → PROJECT_MANAGER (system) + ADMIN (project)  — Trưởng dự án
- *   duc    → TEAM_LEAD (system) + MEMBER (project)       — Tech lead backend
- *   lan    → MEMBER (system) + MEMBER (project)          — Frontend dev
- *   tuan   → MEMBER (system) + MEMBER (project)          — QA/Tester
+ * Kịch bản: Công ty TechVision — 2 dự án đang hoạt động
+ *   Dự án 1: "Hệ thống CRM nội bộ" (key: CRM) — SCRUM, đang Sprint 3
+ *   Dự án 2: "App Mobile KH" (key: MAPP) — KANBAN, đang chạy
+ *
+ * Tài khoản (mật khẩu đều là Demo@123456):
+ *   admin            → admin@techvision.vn       — System Admin / OWNER
+ *   nguyen.van.an    → an.nguyen@techvision.vn   — Project Manager
+ *   tran.thi.bich    → bich.tran@techvision.vn   — Tech Lead Backend
+ *   le.minh.duc      → duc.le@techvision.vn       — Backend Developer
+ *   pham.thi.huong   → huong.pham@techvision.vn  — Frontend Developer
+ *   hoang.van.kiet   → kiet.hoang@techvision.vn  — QA / Tester
  */
 @Component
 @RequiredArgsConstructor
@@ -34,423 +38,499 @@ import java.util.*;
 @Order(100)
 public class DemoDataInitializer implements ApplicationRunner {
 
-    private final UserRepository userRepository;
-    private final ProjectRepository projectRepository;
-    private final ProjectMemberRepository projectMemberRepository;
-    private final BoardRepository boardRepository;
-    private final BoardColumnRepository boardColumnRepository;
-    private final SprintRepository sprintRepository;
-    private final TaskRepository taskRepository;
-    private final LabelRepository labelRepository;
-    private final IssueCategoryRepository issueCategoryRepository;
-    private final CommentRepository commentRepository;
-    private final TimeTrackingRepository timeTrackingRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final TaskLabelRepository taskLabelRepository;
-    private final RoleRepository roleRepository;
-    private final UserRoleRepository userRoleRepository;
+    private final UserRepository               userRepository;
+    private final ProjectRepository            projectRepository;
+    private final ProjectMemberRepository      projectMemberRepository;
+    private final BoardRepository              boardRepository;
+    private final BoardColumnRepository        boardColumnRepository;
+    private final SprintRepository             sprintRepository;
+    private final TaskRepository               taskRepository;
+    private final LabelRepository              labelRepository;
+    private final IssueCategoryRepository      issueCategoryRepository;
+    private final CommentRepository            commentRepository;
+    private final TimeTrackingRepository       timeTrackingRepository;
+    private final TaskLabelRepository          taskLabelRepository;
+    private final TaskWatcherRepository        taskWatcherRepository;
+    private final TaskDependencyRepository     taskDependencyRepository;
+    private final NotificationRepository       notificationRepository;
+    private final RoleRepository               roleRepository;
+    private final UserRoleRepository           userRoleRepository;
+    private final PasswordEncoder              passwordEncoder;
+
+    private static final String DEMO_PASSWORD = "Demo@123456";
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
         if (projectRepository.count() > 0) {
-            log.info("Demo data already exists, skipping.");
+            log.info("Demo data already exists — skipping.");
             return;
         }
+        log.info("Seeding demo data...");
 
-        log.info("Creating demo project data...");
-
-        // ── 0. Load system roles (đã được DataInitializer tạo trước) ──────────
+        // ── 0. System roles (tạo bởi DataInitializer trước) ──────────────────
         Role roleSuperAdmin     = findRole("SUPER_ADMIN");
-        Role roleAdmin          = findRole("ADMIN");
         Role roleProjectManager = findRole("PROJECT_MANAGER");
         Role roleTeamLead       = findRole("TEAM_LEAD");
         Role roleMember         = findRole("MEMBER");
 
-        // ── 1. Lấy / tạo users ───────────────────────────────────────────────
-        User admin = userRepository.findByEmail("admin@taskoryx.com")
-                .orElseGet(() -> userRepository.save(User.builder()
-                        .username("admin")
-                        .email("admin@taskoryx.com")
-                        .passwordHash(passwordEncoder.encode("Admin@123456"))
-                        .fullName("System Administrator")
-                        .isActive(true)
-                        .emailVerified(true)
-                        .mustChangePassword(false)
-                        .build()));
+        // ── 1. Users ──────────────────────────────────────────────────────────
+        User admin  = upsertUser("admin",           "Trần Quốc Admin",    "admin@techvision.vn",        false);
+        User an     = upsertUser("nguyen.van.an",   "Nguyễn Văn An",      "an.nguyen@techvision.vn",    false);
+        User bich   = upsertUser("tran.thi.bich",   "Trần Thị Bích",      "bich.tran@techvision.vn",    false);
+        User duc    = upsertUser("le.minh.duc",     "Lê Minh Đức",        "duc.le@techvision.vn",       false);
+        User huong  = upsertUser("pham.thi.huong",  "Phạm Thị Hương",     "huong.pham@techvision.vn",   false);
+        User kiet   = upsertUser("hoang.van.kiet",  "Hoàng Văn Kiệt",     "kiet.hoang@techvision.vn",   false);
 
-        // nam — quản lý dự án, có quyền thêm thành viên
-        User nam  = createUser("le_namhp",    "Lê Hoàng Nam",   "nam@taskoryx.com");
-        // duc — tech lead backend
-        User duc  = createUser("nguyen_ducnv", "Nguyễn Văn Đức", "duc@taskoryx.com");
-        // lan — frontend developer
-        User lan  = createUser("tran_lant",    "Trần Thị Lan",   "lan@taskoryx.com");
-        // tuan — QA / tester
-        User tuan = createUser("pham_tuanpm",  "Phạm Minh Tuấn", "tuan@taskoryx.com");
+        // ── 2. System roles ───────────────────────────────────────────────────
+        grantSystemRole(admin, roleSuperAdmin);
+        grantSystemRole(an,    roleProjectManager);
+        grantSystemRole(bich,  roleTeamLead);
+        grantSystemRole(duc,   roleMember);
+        grantSystemRole(huong, roleMember);
+        grantSystemRole(kiet,  roleMember);
 
-        // ── 2. Gán system role cho từng user ─────────────────────────────────
-        // admin đã được gán SUPER_ADMIN bởi DataInitializer; chỉ gán cho các user mới
-        assignSystemRole(nam,  roleProjectManager);
-        assignSystemRole(duc,  roleTeamLead);
-        assignSystemRole(lan,  roleMember);
-        assignSystemRole(tuan, roleMember);
-
-        // ── 3. Tạo project ───────────────────────────────────────────────────
-        Project project = projectRepository.save(Project.builder()
-                .name("Nền tảng thương mại điện tử")
-                .description("Xây dựng nền tảng mua sắm trực tuyến với đầy đủ tính năng: " +
-                        "quản lý sản phẩm, giỏ hàng, thanh toán, đơn hàng và báo cáo.")
-                .key("TMDT")
+        // ═══════════════════════════════════════════════════════════════════════
+        // DỰ ÁN 1: Hệ thống CRM nội bộ (SCRUM)
+        // ═══════════════════════════════════════════════════════════════════════
+        Project crm = projectRepository.save(Project.builder()
+                .name("Hệ thống CRM nội bộ")
+                .description("Xây dựng hệ thống quản lý quan hệ khách hàng nội bộ: " +
+                             "quản lý leads, pipeline bán hàng, lịch sử liên lạc, báo cáo doanh số và tự động hóa email.")
+                .key("CRM")
                 .owner(admin)
                 .color("#7c3aed")
-                .icon("shop")
+                .icon("users")
                 .isPublic(false)
                 .isArchived(false)
                 .build());
 
-        // ── 4. Thêm thành viên dự án ─────────────────────────────────────────
-        // Role trong dự án = system role của user (lấy từ getUserRoles())
-        // admin → SUPER_ADMIN, nam → PROJECT_MANAGER, duc → TEAM_LEAD, lan/tuan → MEMBER
-        addMember(project, admin, "OWNER");         // Chủ dự án (đặc biệt)
-        addMember(project, nam,   "PROJECT_MANAGER");
-        addMember(project, duc,   "TEAM_LEAD");
-        addMember(project, lan,   "MEMBER");
-        addMember(project, tuan,  "MEMBER");
+        addMember(crm, admin,  "OWNER");
+        addMember(crm, an,     "PM");
+        addMember(crm, bich,   "MEMBER");
+        addMember(crm, duc,    "MEMBER");
+        addMember(crm, huong,  "MEMBER");
+        addMember(crm, kiet,   "MEMBER");
 
-        // ── 5. Kanban board + columns ─────────────────────────────────────────
-        Board board = boardRepository.save(Board.builder()
-                .project(project).name("Kanban Board").position(0)
+        // Labels CRM
+        Label lBe   = saveLabel(crm, "Backend",     "#22c55e");
+        Label lFe   = saveLabel(crm, "Frontend",    "#3b82f6");
+        Label lApi  = saveLabel(crm, "API",         "#f59e0b");
+        Label lDb   = saveLabel(crm, "Database",    "#8b5cf6");
+        Label lUx   = saveLabel(crm, "UI/UX",       "#ec4899");
+        Label lBug  = saveLabel(crm, "Bug",         "#ef4444");
+        Label lPerf = saveLabel(crm, "Performance", "#f97316");
+
+        // Categories CRM
+        IssueCategory catFeature = saveCategory(crm, "Tính năng",  bich);
+        IssueCategory catBug     = saveCategory(crm, "Bug",        kiet);
+        IssueCategory catImprove = saveCategory(crm, "Cải thiện",  an);
+        IssueCategory catDoc     = saveCategory(crm, "Tài liệu",   an);
+
+        // ── Sprint 1 — Nền tảng (COMPLETED) ──────────────────────────────────
+        Sprint sp1 = saveSprint(crm, "Sprint 1 — Nền tảng",
+                "Thiết kế DB schema, cài môi trường, auth module, skeleton UI.",
+                Sprint.SprintStatus.COMPLETED,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 18));
+
+        Map<Task.TaskStatus, BoardColumn> sp1c = sprintCols(sp1);
+
+        Task t1 = saveTask(crm, 1, "Thiết kế database schema",
+                "Thiết kế toàn bộ schema: customers, contacts, deals, pipelines, activities, notes, tags.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
+                bich, admin,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 8),
+                bd(16), bd(18), null, catFeature,
+                sp1, sp1.getBoard(), sp1c.get(Task.TaskStatus.DONE), bd(1000));
+        addLabels(t1, lBe, lDb);
+        logTime(t1, bich, "Phân tích yêu cầu, vẽ ER diagram", 6.0, LocalDate.of(2026, 1, 6));
+        logTime(t1, bich, "Viết migration scripts V1", 5.0, LocalDate.of(2026, 1, 7));
+        logTime(t1, bich, "Review và finalize schema với team", 3.0, LocalDate.of(2026, 1, 8));
+        comment(t1, an,   "Schema trông ổn. Tuy nhiên bảng `activities` thiếu index cho (customer_id, created_at) — sẽ rất chậm khi lọc lịch sử theo khách hàng.");
+        comment(t1, bich, "Đã thêm composite index. Cũng tạo thêm partial index cho deal trong trạng thái OPEN để tối ưu pipeline view.");
+        comment(t1, duc,  "Đồng ý thiết kế. Một lưu ý: cột `metadata` nên dùng kiểu JSONB thay vì TEXT để query được bên trong.");
+        comment(t1, bich, "Cảm ơn @duc.le, đã đổi sang JSONB rồi.");
+
+        Task t2 = saveTask(crm, 2, "Cài đặt môi trường CI/CD",
+                "Cấu hình Docker Compose, GitHub Actions pipeline, môi trường dev/staging/prod.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
+                an, admin,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 7),
+                bd(10), bd(9), null, catFeature,
+                sp1, sp1.getBoard(), sp1c.get(Task.TaskStatus.DONE), bd(2000));
+        addLabels(t2, lBe);
+        logTime(t2, an, "Docker Compose + env vars", 4.0, LocalDate.of(2026, 1, 6));
+        logTime(t2, an, "GitHub Actions workflow", 4.0, LocalDate.of(2026, 1, 7));
+        comment(t2, an,   "Môi trường đã up. Mọi người chạy `docker compose up -d` là được. DB seed tự động chạy khi start.");
+
+        Task t3 = saveTask(crm, 3, "Module xác thực người dùng",
+                "JWT auth: đăng nhập, refresh token, phân quyền RBAC, middleware bảo vệ route.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
+                bich, admin,
+                LocalDate.of(2026, 1, 7), LocalDate.of(2026, 1, 13),
+                bd(20), bd(19), null, catFeature,
+                sp1, sp1.getBoard(), sp1c.get(Task.TaskStatus.DONE), bd(3000));
+        addLabels(t3, lBe, lApi);
+        logTime(t3, bich, "Implement JWT filter, UserDetails, SecurityConfig", 8.0, LocalDate.of(2026, 1, 9));
+        logTime(t3, bich, "RBAC: Role, Permission, UserRole entities + service", 6.0, LocalDate.of(2026, 1, 10));
+        logTime(t3, bich, "Unit test auth endpoints", 4.0, LocalDate.of(2026, 1, 12));
+        comment(t3, kiet, "Test xong auth flow. Tất cả case pass: login thành công, sai mật khẩu, token hết hạn, refresh token, logout. Merge được.");
+        comment(t3, an,   "Chú ý: nếu refresh token đã bị revoke cần trả 401 không phải 403 để FE biết cách redirect đúng.");
+        comment(t3, bich, "Đã fix, cảm ơn @an.nguyen.");
+
+        Task t4 = saveTask(crm, 4, "Skeleton giao diện chính",
+                "Layout chính: sidebar nav, header, breadcrumb, responsive breakpoints, dark mode toggle.",
+                Task.TaskPriority.MEDIUM, Task.TaskStatus.DONE,
+                huong, admin,
+                LocalDate.of(2026, 1, 8), LocalDate.of(2026, 1, 16),
+                bd(24), bd(22), null, catFeature,
+                sp1, sp1.getBoard(), sp1c.get(Task.TaskStatus.DONE), bd(4000));
+        addLabels(t4, lFe, lUx);
+        logTime(t4, huong, "Thiết kế layout và component system", 8.0, LocalDate.of(2026, 1, 9));
+        logTime(t4, huong, "Implement Sidebar và Header", 7.0, LocalDate.of(2026, 1, 13));
+        logTime(t4, huong, "Dark mode và responsive", 5.0, LocalDate.of(2026, 1, 15));
+        comment(t4, huong, "Dark mode xong. Dùng CSS variables + Tailwind, toggle lưu vào localStorage.");
+        comment(t4, an,    "UI trông clean. Góp ý nhỏ: sidebar nên có trạng thái collapsed để tăng không gian làm việc.");
+        comment(t4, huong, "Đã thêm collapsed state với animation. Lưu preference vào localStorage.");
+
+        // ── Sprint 2 — Quản lý khách hàng (COMPLETED) ────────────────────────
+        Sprint sp2 = saveSprint(crm, "Sprint 2 — Quản lý khách hàng",
+                "CRUD khách hàng, import CSV, tìm kiếm nâng cao, giao diện danh sách và chi tiết.",
+                Sprint.SprintStatus.COMPLETED,
+                LocalDate.of(2026, 1, 19), LocalDate.of(2026, 2, 1));
+
+        Map<Task.TaskStatus, BoardColumn> sp2c = sprintCols(sp2);
+
+        Task t5 = saveTask(crm, 5, "CRUD API khách hàng",
+                "API quản lý khách hàng: tạo, sửa, xóa, phân trang, lọc đa tiêu chí, soft delete.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
+                bich, admin,
+                LocalDate.of(2026, 1, 19), LocalDate.of(2026, 1, 24),
+                bd(20), bd(21), null, catFeature,
+                sp2, sp2.getBoard(), sp2c.get(Task.TaskStatus.DONE), bd(1000));
+        addLabels(t5, lBe, lApi);
+        logTime(t5, bich, "CRUD endpoints + validation", 8.0, LocalDate.of(2026, 1, 21));
+        logTime(t5, bich, "Specification filter + phân trang", 6.0, LocalDate.of(2026, 1, 23));
+        comment(t5, duc,  "API trả về đủ field cần thiết. Thêm field `lastContactedAt` vào response để FE hiển thị không?");
+        comment(t5, bich, "Đã thêm vào CustomerResponse, tính từ bảng activities mới nhất.");
+
+        Task t6 = saveTask(crm, 6, "Import khách hàng từ CSV",
+                "Upload file CSV, validate dữ liệu, preview trước khi import, xử lý lỗi từng dòng.",
+                Task.TaskPriority.MEDIUM, Task.TaskStatus.DONE,
+                duc, admin,
+                LocalDate.of(2026, 1, 21), LocalDate.of(2026, 1, 28),
+                bd(16), bd(18), null, catFeature,
+                sp2, sp2.getBoard(), sp2c.get(Task.TaskStatus.DONE), bd(2000));
+        addLabels(t6, lBe, lApi);
+        logTime(t6, duc, "CSV parser + validation logic", 7.0, LocalDate.of(2026, 1, 24));
+        logTime(t6, duc, "Batch insert + error report", 6.0, LocalDate.of(2026, 1, 27));
+        comment(t6, kiet, "Test import 500 dòng: 480 thành công, 20 lỗi (email trùng). Báo lỗi rõ ràng từng dòng, accepted.");
+
+        Task t7 = saveTask(crm, 7, "Giao diện danh sách khách hàng",
+                "Table view với sort/filter/search, infinite scroll, quick actions, bulk select.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
+                huong, admin,
+                LocalDate.of(2026, 1, 21), LocalDate.of(2026, 1, 29),
+                bd(20), bd(22), null, catFeature,
+                sp2, sp2.getBoard(), sp2c.get(Task.TaskStatus.DONE), bd(3000));
+        addLabels(t7, lFe, lUx);
+        logTime(t7, huong, "CustomerTable với virtual scroll", 9.0, LocalDate.of(2026, 1, 26));
+        logTime(t7, huong, "Filter panel và bulk actions", 7.0, LocalDate.of(2026, 1, 28));
+        comment(t7, an,    "Bulk delete cần confirmation dialog. Và nên có undo trong 5 giây sau khi xóa.");
+        comment(t7, huong, "Đã thêm confirm dialog và toast với nút Undo (soft delete 5 giây).");
+
+        Task t8 = saveTask(crm, 8, "Fix bug: Lọc theo ngày tạo sai múi giờ",
+                "Khi lọc khách hàng theo ngày tạo, kết quả bị lệch 1 ngày do FE gửi UTC thay vì Asia/Ho_Chi_Minh.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
+                huong, kiet,
+                LocalDate.of(2026, 1, 27), LocalDate.of(2026, 1, 28),
+                bd(3), bd(2), null, catBug,
+                sp2, sp2.getBoard(), sp2c.get(Task.TaskStatus.DONE), bd(4000));
+        addLabels(t8, lFe, lBug);
+        comment(t8, kiet,  "Reproduce: lọc ngày 2026-01-20, nhận được record tạo lúc 23:00 ngày 19 (đúng giờ VN là 06:00 ngày 20). Server xử lý timezone sai.");
+        comment(t8, huong, "Fix: DatePicker giờ gửi `date + T00:00:00+07:00` thay vì UTC. Backend nhận LocalDate nên không bị lệch.");
+        comment(t8, kiet,  "Retest OK. Closing.");
+
+        // ── Sprint 3 — Pipeline bán hàng (ACTIVE) ────────────────────────────
+        Sprint sp3 = saveSprint(crm, "Sprint 3 — Pipeline bán hàng",
+                "Deal management, pipeline Kanban, forecast doanh số, reminder tự động.",
+                Sprint.SprintStatus.ACTIVE,
+                LocalDate.of(2026, 5, 19), LocalDate.of(2026, 6, 1));
+
+        Map<Task.TaskStatus, BoardColumn> sp3c = sprintCols(sp3);
+
+        Task t9 = saveTask(crm, 9, "API quản lý deals",
+                "CRUD deal: tạo, cập nhật stage, ghi note, gán nhân viên, set expected close date, probability.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
+                bich, admin,
+                LocalDate.of(2026, 5, 19), LocalDate.of(2026, 5, 23),
+                bd(20), bd(21), null, catFeature,
+                sp3, sp3.getBoard(), sp3c.get(Task.TaskStatus.DONE), bd(1000));
+        addLabels(t9, lBe, lApi);
+        logTime(t9, bich, "Deal entity, repo, service, controller", 10.0, LocalDate.of(2026, 5, 21));
+        logTime(t9, bich, "Stage transition logic + validation", 5.0, LocalDate.of(2026, 5, 22));
+        comment(t9, duc, "API tốt. Thêm endpoint `GET /deals/summary?period=monthly` để FE render forecast chart không?");
+        comment(t9, bich, "Đã thêm, gộp theo month + stage, trả về tổng value và count.");
+
+        Task t10 = saveTask(crm, 10, "Pipeline Kanban view",
+                "Giao diện pipeline: kéo thả deal giữa các stage, hiển thị tổng value mỗi cột, quick edit.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.IN_PROGRESS,
+                huong, admin,
+                LocalDate.of(2026, 5, 21), LocalDate.of(2026, 5, 28),
+                bd(24), null, null, catFeature,
+                sp3, sp3.getBoard(), sp3c.get(Task.TaskStatus.IN_PROGRESS), bd(2000));
+        addLabels(t10, lFe, lUx);
+        logTime(t10, huong, "Setup dnd-kit, DealCard component", 8.0, LocalDate.of(2026, 5, 24));
+        comment(t10, huong, "Drag & drop cơ bản đã hoạt động. Đang xử lý optimistic update và rollback khi API lỗi.");
+        comment(t10, an,    "Nhớ debounce API call khi kéo thả nhanh liên tục, tránh spam request.");
+        comment(t10, huong, "Đã xử lý bằng optimistic UI — chỉ gọi API 1 lần khi drop, không gọi khi đang drag.");
+
+        Task t11 = saveTask(crm, 11, "Forecast doanh số",
+                "Dashboard forecast: biểu đồ pipeline theo tháng, win rate, average deal size, trend 6 tháng.",
+                Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
+                duc, admin,
+                LocalDate.of(2026, 5, 26), LocalDate.of(2026, 5, 30),
+                bd(16), null, null, catFeature,
+                sp3, sp3.getBoard(), sp3c.get(Task.TaskStatus.TODO), bd(3000));
+        addLabels(t11, lFe, lBe);
+        comment(t11, an, "Cần trao đổi với sales team về các metric quan trọng trước khi implement. Tôi sẽ gửi brief vào thứ Hai.");
+
+        Task t12 = saveTask(crm, 12, "Reminder tự động cho deals",
+                "Gửi email/notification nhắc nhở khi deal sắp đến expected close date hoặc không có activity trong N ngày.",
+                Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
+                bich, admin,
+                LocalDate.of(2026, 5, 26), LocalDate.of(2026, 6, 1),
+                bd(12), null, null, catFeature,
+                sp3, sp3.getBoard(), sp3c.get(Task.TaskStatus.TODO), bd(4000));
+        addLabels(t12, lBe);
+
+        Task t13 = saveTask(crm, 13, "Fix bug: Tìm kiếm khách hàng không tìm được số điện thoại",
+                "Search bar tìm theo tên và email OK, nhưng tìm theo số điện thoại (VD: 0912345678) không trả về kết quả.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.IN_REVIEW,
+                bich, kiet,
+                LocalDate.of(2026, 5, 27), LocalDate.of(2026, 5, 29),
+                bd(4), bd(3), null, catBug,
+                sp3, sp3.getBoard(), sp3c.get(Task.TaskStatus.IN_REVIEW), bd(5000));
+        addLabels(t13, lBe, lBug);
+        logTime(t13, bich, "Debug và fix search query", 3.0, LocalDate.of(2026, 5, 28));
+        comment(t13, kiet, "Reproduce: search '0912345678' → 0 kết quả. Tuy nhiên search '912345' (bỏ đầu) lại tìm thấy. Có vẻ do chuẩn hóa số điện thoại.");
+        comment(t13, bich, "Root cause: DB lưu '0912345678', search query dùng LIKE '%912345678%' (bỏ số 0 đầu). Fix bằng cách normalize input trước khi search.");
+        comment(t13, bich, "Đã fix + thêm test case. Assign @kiet.hoang retest.");
+
+        Task t14 = saveTask(crm, 14, "Viết tài liệu API cho module Deals",
+                "OpenAPI spec, ví dụ request/response, mô tả business rules, error codes.",
+                Task.TaskPriority.LOW, Task.TaskStatus.TODO,
+                an, admin,
+                LocalDate.of(2026, 5, 28), LocalDate.of(2026, 6, 1),
+                bd(8), null, null, catDoc,
+                sp3, sp3.getBoard(), sp3c.get(Task.TaskStatus.TODO), bd(6000));
+        addLabels(t14, lApi);
+
+        // Task dependency: t11 (Forecast) phụ thuộc t9 (API deals) đã xong
+        taskDependencyRepository.save(TaskDependency.builder()
+                .task(t11).dependsOnTask(t9)
+                .type(TaskDependency.DependencyType.DEPENDS_ON).build());
+        // t12 (Reminder) phụ thuộc t9 (API deals)
+        taskDependencyRepository.save(TaskDependency.builder()
+                .task(t12).dependsOnTask(t9)
+                .type(TaskDependency.DependencyType.DEPENDS_ON).build());
+        // t14 (Docs) phụ thuộc t9 (API deals)
+        taskDependencyRepository.save(TaskDependency.builder()
+                .task(t14).dependsOnTask(t9)
+                .type(TaskDependency.DependencyType.DEPENDS_ON).build());
+
+        // Sprint 4 — PLANNED
+        Sprint sp4 = saveSprint(crm, "Sprint 4 — Tích hợp & Báo cáo",
+                "Email integration, báo cáo tổng hợp, export Excel, webhook outbound.",
+                Sprint.SprintStatus.PLANNED,
+                LocalDate.of(2026, 6, 2), LocalDate.of(2026, 6, 15));
+
+        Map<Task.TaskStatus, BoardColumn> sp4c = sprintCols(sp4);
+
+        Task t15 = saveTask(crm, 15, "Tích hợp Gmail / Outlook",
+                "Kết nối hộp thư Gmail/Outlook, đồng bộ email liên quan đến khách hàng vào CRM.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.TODO,
+                bich, admin, null, null,
+                bd(28), null, null, catFeature,
+                sp4, sp4.getBoard(), sp4c.get(Task.TaskStatus.TODO), bd(1000));
+        addLabels(t15, lBe, lApi);
+
+        Task t16 = saveTask(crm, 16, "Báo cáo tổng hợp doanh số",
+                "Dashboard báo cáo: doanh số theo nhân viên, theo tháng/quý, top khách hàng, conversion rate.",
+                Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
+                duc, admin, null, null,
+                bd(20), null, null, catFeature,
+                sp4, sp4.getBoard(), sp4c.get(Task.TaskStatus.TODO), bd(2000));
+        addLabels(t16, lBe, lFe);
+
+        // Watchers
+        watch(t10, an);
+        watch(t10, duc);
+        watch(t13, an);
+        watch(t13, kiet);
+        watch(t9,  an);
+
+        // Notifications mẫu
+        saveNotification(bich,
+                Notification.NotificationType.TASK_ASSIGNED,
+                "Task mới được giao",
+                "Bạn được giao task [CRM-13] Fix bug: Tìm kiếm khách hàng không tìm được số điện thoại",
+                Notification.RelatedType.TASK, t13.getId(), false);
+        saveNotification(kiet,
+                Notification.NotificationType.MENTION,
+                "Bạn được nhắc đến",
+                "Trần Thị Bích đã đề cập đến bạn trong task [CRM-13]",
+                Notification.RelatedType.TASK, t13.getId(), false);
+        saveNotification(huong,
+                Notification.NotificationType.TASK_UPDATED,
+                "Task được cập nhật",
+                "Task [CRM-10] Pipeline Kanban view vừa được cập nhật bởi Hoàng Văn Kiệt",
+                Notification.RelatedType.TASK, t10.getId(), true);
+        saveNotification(an,
+                Notification.NotificationType.TASK_COMMENTED,
+                "Bình luận mới",
+                "Trần Thị Bích đã bình luận vào task [CRM-9] API quản lý deals",
+                Notification.RelatedType.TASK, t9.getId(), true);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // DỰ ÁN 2: App Mobile Khách hàng (KANBAN)
+        // ═══════════════════════════════════════════════════════════════════════
+        Project mapp = projectRepository.save(Project.builder()
+                .name("App Mobile Khách hàng")
+                .description("Ứng dụng mobile React Native cho khách hàng: xem deals, tra cứu thông tin liên hệ, push notification.")
+                .key("MAPP")
+                .owner(an)
+                .color("#0ea5e9")
+                .icon("mobile")
+                .isPublic(false)
+                .isArchived(false)
+                .build());
+
+        addMember(mapp, an,    "OWNER");
+        addMember(mapp, bich,  "PM");
+        addMember(mapp, huong, "MEMBER");
+        addMember(mapp, duc,   "MEMBER");
+        addMember(mapp, kiet,  "MEMBER");
+
+        // Kanban board
+        Board mboard = boardRepository.save(Board.builder()
+                .project(mapp).name("Kanban Board")
+                .position(0)
                 .boardType(Board.BoardType.KANBAN)
                 .isDefault(true)
                 .build());
 
-        BoardColumn colTodo   = saveColumn(board, "Cần làm",     0, "#6b7280", Task.TaskStatus.TODO,        false);
-        BoardColumn colInProg = saveColumn(board, "Đang làm",    1, "#3b82f6", Task.TaskStatus.IN_PROGRESS, false);
-        BoardColumn colReview = saveColumn(board, "Đang review", 2, "#f59e0b", Task.TaskStatus.IN_REVIEW,   false);
-        BoardColumn colDone   = saveColumn(board, "Đã xong",     3, "#22c55e", Task.TaskStatus.DONE,        true);
+        BoardColumn mColBacklog = col(mboard, "Backlog",      0, "#6b7280", Task.TaskStatus.TODO,        false);
+        BoardColumn mColTodo    = col(mboard, "To Do",        1, "#64748b", Task.TaskStatus.TODO,        false);
+        BoardColumn mColDoing   = col(mboard, "In Progress",  2, "#3b82f6", Task.TaskStatus.IN_PROGRESS, false);
+        BoardColumn mColReview  = col(mboard, "Review",       3, "#f59e0b", Task.TaskStatus.IN_REVIEW,   false);
+        BoardColumn mColDone    = col(mboard, "Done",         4, "#22c55e", Task.TaskStatus.DONE,        true);
 
-        // ── 6. Labels ─────────────────────────────────────────────────────────
-        Label lFe   = saveLabel(project, "Frontend",    "#3b82f6");
-        Label lBe   = saveLabel(project, "Backend",     "#22c55e");
-        Label lApi  = saveLabel(project, "API",         "#f59e0b");
-        Label lDb   = saveLabel(project, "Database",    "#8b5cf6");
-        Label lUx   = saveLabel(project, "UI/UX",       "#ec4899");
-        Label lCrit = saveLabel(project, "Critical",    "#ef4444");
-        Label lPerf = saveLabel(project, "Performance", "#f97316");
+        Label mlMobile = saveLabel(mapp, "Mobile",   "#0ea5e9");
+        Label mlApi    = saveLabel(mapp, "API",      "#f59e0b");
+        Label mlUx     = saveLabel(mapp, "UI/UX",    "#ec4899");
+        Label mlBug    = saveLabel(mapp, "Bug",      "#ef4444");
 
-        // ── 7. Issue categories ───────────────────────────────────────────────
-        IssueCategory catBug     = saveCategory(project, "Bug",       tuan);
-        IssueCategory catFeature = saveCategory(project, "Tính năng", duc);
-        IssueCategory catImprove = saveCategory(project, "Cải thiện", null);
-        IssueCategory catDoc     = saveCategory(project, "Tài liệu",  nam);
+        IssueCategory mCatFeature = saveCategory(mapp, "Tính năng", huong);
+        IssueCategory mCatBug     = saveCategory(mapp, "Bug",       kiet);
 
-        // ── 8. Sprints ────────────────────────────────────────────────────────
-        Sprint sp1 = saveSprint(project, "Sprint 1 — Nền tảng",
-                "Thiết lập hạ tầng, xác thực người dùng, trang chủ cơ bản.",
-                Sprint.SprintStatus.COMPLETED,
-                LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 19));
-
-        Sprint sp2 = saveSprint(project, "Sprint 2 — Sản phẩm",
-                "Quản lý sản phẩm, tìm kiếm, upload ảnh.",
-                Sprint.SprintStatus.COMPLETED,
-                LocalDate.of(2026, 1, 20), LocalDate.of(2026, 2, 2));
-
-        Sprint sp3 = saveSprint(project, "Sprint 3 — Mua sắm",
-                "Giỏ hàng, thanh toán VNPay, tối ưu query.",
-                Sprint.SprintStatus.COMPLETED,
-                LocalDate.of(2026, 2, 3), LocalDate.of(2026, 2, 16));
-
-        Sprint sp4 = saveSprint(project, "Sprint 4 — Đơn hàng",
-                "Quản lý đơn hàng, email thông báo, dashboard thống kê.",
-                Sprint.SprintStatus.ACTIVE,
-                LocalDate.of(2026, 3, 17), LocalDate.of(2026, 3, 30));
-
-        Sprint sp5 = saveSprint(project, "Sprint 5 — Tiện ích",
-                "Rating sản phẩm, yêu thích, cải thiện UX, xuất báo cáo, khuyến mãi.",
-                Sprint.SprintStatus.PLANNED,
-                LocalDate.of(2026, 4, 28), LocalDate.of(2026, 5, 11));
-
-        Map<Task.TaskStatus, BoardColumn> sp1Cols = loadSprintColumns(sp1);
-        Map<Task.TaskStatus, BoardColumn> sp2Cols = loadSprintColumns(sp2);
-        Map<Task.TaskStatus, BoardColumn> sp3Cols = loadSprintColumns(sp3);
-        Map<Task.TaskStatus, BoardColumn> sp4Cols = loadSprintColumns(sp4);
-        Map<Task.TaskStatus, BoardColumn> sp5Cols = loadSprintColumns(sp5);
-
-        // ── 9. Tasks Sprint 1 (COMPLETED) ────────────────────────────────────
-        Task t1 = saveTask(project, 1, "Thiết kế database schema",
-                "Thiết kế toàn bộ schema cho các bảng: users, products, orders, payments, categories.",
+        // Tasks KANBAN dự án 2
+        Task m1 = saveTask(mapp, 1, "Màn hình đăng nhập",
+                "Login screen: email/password, biometric, remember me, forgot password flow.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 9),
-                BigDecimal.valueOf(16), BigDecimal.valueOf(18),
-                null, catFeature, sp1, sp1.getBoard(), sp1Cols.get(Task.TaskStatus.DONE), new BigDecimal("1000"));
-        addLabels(t1, lBe, lDb);
-        addTimeLog(t1, duc, "Phân tích yêu cầu và thiết kế ER diagram", 8, LocalDate.of(2026, 1, 7));
-        addTimeLog(t1, duc, "Viết migration script", 6, LocalDate.of(2026, 1, 8));
-        addComment(t1, admin, "Schema trông ổn, tuy nhiên cần thêm index cho cột `product_id` trong bảng `order_items` để tối ưu query thống kê.");
-        addComment(t1, duc,   "Đã thêm index. Cũng đã tạo composite index cho (user_id, created_at) trong bảng orders.");
+                huong, an,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 7),
+                bd(16), bd(15), null, mCatFeature,
+                null, mboard, mColDone, bd(1000));
+        addLabels(m1, mlMobile, mlUx);
+        comment(m1, an, "Biometric login hoạt động tốt trên iOS. Android cần test thêm.");
+        comment(m1, huong, "Đã test trên Pixel 6 và Samsung S23 — OK cả hai.");
 
-        Task t2 = saveTask(project, 2, "Cài đặt môi trường development",
-                "Cấu hình Docker Compose, CI/CD pipeline, môi trường dev/staging.",
+        Task m2 = saveTask(mapp, 2, "Màn hình danh sách deals",
+                "Hiển thị deals được giao, lọc theo stage và priority, pull-to-refresh.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                nam, admin, LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 8),
-                BigDecimal.valueOf(8), BigDecimal.valueOf(10),
-                null, catFeature, sp1, sp1.getBoard(), sp1Cols.get(Task.TaskStatus.DONE), new BigDecimal("2000"));
-        addLabels(t2, lBe);
-        addTimeLog(t2, nam, "Cấu hình Docker Compose và environment variables", 5, LocalDate.of(2026, 1, 7));
-        addComment(t2, nam, "Đã setup xong môi trường. PostgreSQL chạy ở port 5432, Redis port 6379. Mọi người clone repo và chạy `docker-compose up -d` là được.");
+                huong, an,
+                LocalDate.of(2026, 3, 5), LocalDate.of(2026, 3, 12),
+                bd(20), bd(21), null, mCatFeature,
+                null, mboard, mColDone, bd(2000));
+        addLabels(m2, mlMobile, mlUx);
+        logTime(m2, huong, "Implement DealList screen với filters", 10.0, LocalDate.of(2026, 3, 10));
 
-        Task t3 = saveTask(project, 3, "Thiết kế giao diện trang chủ",
-                "Thiết kế mockup và implement trang chủ: banner, danh mục nổi bật, sản phẩm gợi ý.",
-                Task.TaskPriority.MEDIUM, Task.TaskStatus.DONE,
-                lan, admin, LocalDate.of(2026, 1, 8), LocalDate.of(2026, 1, 14),
-                BigDecimal.valueOf(20), BigDecimal.valueOf(22),
-                null, catFeature, sp1, sp1.getBoard(), sp1Cols.get(Task.TaskStatus.DONE), new BigDecimal("3000"));
-        addLabels(t3, lFe, lUx);
-        addTimeLog(t3, lan, "Thiết kế wireframe và prototype Figma", 6, LocalDate.of(2026, 1, 9));
-        addTimeLog(t3, lan, "Implement component Banner và CategoryGrid", 8, LocalDate.of(2026, 1, 13));
-
-        Task t4 = saveTask(project, 4, "API xác thực người dùng",
-                "Implement JWT authentication: đăng ký, đăng nhập, refresh token, đổi mật khẩu.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 1, 8), LocalDate.of(2026, 1, 15),
-                BigDecimal.valueOf(16), BigDecimal.valueOf(14),
-                null, catFeature, sp1, sp1.getBoard(), sp1Cols.get(Task.TaskStatus.DONE), new BigDecimal("4000"));
-        addLabels(t4, lBe, lApi);
-        addTimeLog(t4, duc, "Implement JWT filter và UserDetails", 5, LocalDate.of(2026, 1, 10));
-        addTimeLog(t4, duc, "Viết unit test cho auth endpoints", 4, LocalDate.of(2026, 1, 14));
-        addComment(t4, tuan, "Đã test tất cả auth endpoints, hoạt động tốt. Tuy nhiên cần xử lý case khi refresh token đã hết hạn trả về 401 thay vì 500.");
-        addComment(t4, duc,  "Đã fix. Thêm `TokenExpiredException` vào GlobalExceptionHandler rồi.");
-
-        Task t5 = saveTask(project, 5, "Trang đăng ký / đăng nhập",
-                "Implement form đăng ký, đăng nhập với validation, xử lý lỗi và UX flows.",
-                Task.TaskPriority.MEDIUM, Task.TaskStatus.DONE,
-                lan, admin, LocalDate.of(2026, 1, 10), LocalDate.of(2026, 1, 17),
-                BigDecimal.valueOf(12), BigDecimal.valueOf(13),
-                null, catFeature, sp1, sp1.getBoard(), sp1Cols.get(Task.TaskStatus.DONE), new BigDecimal("5000"));
-        addLabels(t5, lFe, lUx);
-        addTimeLog(t5, lan, "Implement form login/register với React Hook Form", 7, LocalDate.of(2026, 1, 15));
-
-        // ── 10. Tasks Sprint 2 (COMPLETED) ───────────────────────────────────
-        Task t6 = saveTask(project, 6, "Module quản lý sản phẩm",
-                "CRUD sản phẩm: tạo, sửa, xóa, phân trang, lọc theo category, tìm kiếm.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 1, 20), LocalDate.of(2026, 1, 27),
-                BigDecimal.valueOf(24), BigDecimal.valueOf(26),
-                null, catFeature, sp2, sp2.getBoard(), sp2Cols.get(Task.TaskStatus.DONE), new BigDecimal("1000"));
-        addLabels(t6, lBe, lApi);
-        addTimeLog(t6, duc, "Implement CRUD endpoints sản phẩm", 10, LocalDate.of(2026, 1, 22));
-        addTimeLog(t6, duc, "Viết unit test và integration test", 6, LocalDate.of(2026, 1, 25));
-
-        Task t7 = saveTask(project, 7, "Giao diện danh sách sản phẩm",
-                "Trang danh sách sản phẩm: grid/list view, filter sidebar, sort, phân trang.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                lan, admin, LocalDate.of(2026, 1, 22), LocalDate.of(2026, 1, 29),
-                BigDecimal.valueOf(20), BigDecimal.valueOf(21),
-                null, catFeature, sp2, sp2.getBoard(), sp2Cols.get(Task.TaskStatus.DONE), new BigDecimal("2000"));
-        addLabels(t7, lFe, lUx);
-        addTimeLog(t7, lan, "Implement ProductGrid và FilterSidebar", 9, LocalDate.of(2026, 1, 27));
-        addComment(t7, lan, "Đã implement xong grid view. List view sẽ làm trong sprint sau nếu còn thời gian.");
-        addComment(t7, nam, "OK, grid view là đủ cho v1.0. List view để sprint sau nhé.");
-
-        Task t8 = saveTask(project, 8, "Tính năng tìm kiếm sản phẩm",
-                "Full-text search sản phẩm theo tên, mô tả, category với autocomplete.",
-                Task.TaskPriority.MEDIUM, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 1, 23), LocalDate.of(2026, 1, 30),
-                BigDecimal.valueOf(16), BigDecimal.valueOf(15),
-                null, catFeature, sp2, sp2.getBoard(), sp2Cols.get(Task.TaskStatus.DONE), new BigDecimal("3000"));
-        addLabels(t8, lBe, lPerf);
-        addTimeLog(t8, duc, "Implement full-text search với PostgreSQL tsvector", 8, LocalDate.of(2026, 1, 28));
-
-        Task t9 = saveTask(project, 9, "Fix bug: Lỗi validation form đăng ký",
-                "Form đăng ký không hiển thị thông báo lỗi khi email đã tồn tại. Server trả về 400 nhưng FE không bắt được.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                lan, tuan, LocalDate.of(2026, 1, 25), LocalDate.of(2026, 1, 27),
-                BigDecimal.valueOf(4), BigDecimal.valueOf(3),
-                null, catBug, sp2, sp2.getBoard(), sp2Cols.get(Task.TaskStatus.DONE), new BigDecimal("4000"));
-        addLabels(t9, lFe, lCrit);
-        addComment(t9, tuan, "Bug được tìm thấy khi test flow đăng ký. Response body có `success: false` nhưng FE chỉ check HTTP status code 200.");
-        addComment(t9, lan,  "Đã fix. Giờ interceptor axios kiểm tra cả `data.success` trước khi resolve promise.");
-        addComment(t9, tuan, "Đã retest, confirmed fixed. Closing.");
-
-        Task t10 = saveTask(project, 10, "Upload ảnh sản phẩm",
-                "Tích hợp upload ảnh sản phẩm: multipart/form-data, resize tự động, lưu local storage.",
-                Task.TaskPriority.MEDIUM, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 1, 27), LocalDate.of(2026, 2, 1),
-                BigDecimal.valueOf(12), BigDecimal.valueOf(11),
-                null, catFeature, sp2, sp2.getBoard(), sp2Cols.get(Task.TaskStatus.DONE), new BigDecimal("5000"));
-        addLabels(t10, lBe);
-        addTimeLog(t10, duc, "Implement file upload endpoint với validation", 6, LocalDate.of(2026, 1, 29));
-
-        // ── 11. Tasks Sprint 3 (COMPLETED) ───────────────────────────────────
-        Task t11 = saveTask(project, 11, "Module giỏ hàng",
-                "API giỏ hàng: thêm/xóa/cập nhật số lượng sản phẩm, tính tổng tiền, kiểm tra tồn kho.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 2, 3), LocalDate.of(2026, 2, 10),
-                BigDecimal.valueOf(20), BigDecimal.valueOf(22),
-                null, catFeature, sp3, sp3.getBoard(), sp3Cols.get(Task.TaskStatus.DONE), new BigDecimal("1000"));
-        addLabels(t11, lBe, lApi);
-        addTimeLog(t11, duc, "Implement cart service và repository", 8, LocalDate.of(2026, 2, 5));
-        addTimeLog(t11, duc, "Xử lý race condition khi cập nhật tồn kho", 4, LocalDate.of(2026, 2, 7));
-
-        Task t12 = saveTask(project, 12, "Giao diện giỏ hàng",
-                "Trang giỏ hàng: danh sách sản phẩm, cập nhật số lượng real-time, tính toán giá.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                lan, admin, LocalDate.of(2026, 2, 5), LocalDate.of(2026, 2, 12),
-                BigDecimal.valueOf(16), BigDecimal.valueOf(17),
-                null, catFeature, sp3, sp3.getBoard(), sp3Cols.get(Task.TaskStatus.DONE), new BigDecimal("2000"));
-        addLabels(t12, lFe, lUx);
-        addTimeLog(t12, lan, "Implement CartPage và CartItem component", 10, LocalDate.of(2026, 2, 10));
-        addComment(t12, lan, "Đã xong. Số lượng update optimistic UI, nếu API fail thì revert lại.");
-
-        Task t13 = saveTask(project, 13, "Tích hợp cổng thanh toán VNPay",
-                "Tích hợp VNPay: tạo URL thanh toán, xử lý callback, cập nhật trạng thái đơn hàng.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 2, 7), LocalDate.of(2026, 2, 14),
-                BigDecimal.valueOf(24), BigDecimal.valueOf(28),
-                null, catFeature, sp3, sp3.getBoard(), sp3Cols.get(Task.TaskStatus.DONE), new BigDecimal("3000"));
-        addLabels(t13, lBe, lApi);
-        addTimeLog(t13, duc, "Implement VNPay integration và callback handler", 12, LocalDate.of(2026, 2, 11));
-        addTimeLog(t13, duc, "Test và fix edge cases", 6, LocalDate.of(2026, 2, 13));
-        addComment(t13, tuan, "Test payment flow xong. Tất cả 4 scenarios (success, fail, timeout, cancel) đều hoạt động đúng.");
-
-        Task t14 = saveTask(project, 14, "Fix bug: Giỏ hàng không cập nhật realtime",
-                "Khi nhiều tab cùng mở, thay đổi số lượng ở tab này không sync sang tab kia.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                lan, tuan, LocalDate.of(2026, 2, 8), LocalDate.of(2026, 2, 10),
-                BigDecimal.valueOf(8), BigDecimal.valueOf(6),
-                null, catBug, sp3, sp3.getBoard(), sp3Cols.get(Task.TaskStatus.DONE), new BigDecimal("4000"));
-        addLabels(t14, lFe, lCrit);
-        addComment(t14, tuan, "Reproduce được. Mở 2 tab, tab 1 thêm sản phẩm vào giỏ → tab 2 không cập nhật số lượng trên icon giỏ hàng.");
-        addComment(t14, lan,  "Fix bằng cách dùng BroadcastChannel API để sync state giữa các tab.");
-
-        Task t15 = saveTask(project, 15, "Tối ưu query danh sách sản phẩm",
-                "Query lấy danh sách sản phẩm đang chạy 2-3s. Cần tối ưu xuống dưới 200ms.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.DONE,
-                duc, admin, LocalDate.of(2026, 2, 10), LocalDate.of(2026, 2, 15),
-                BigDecimal.valueOf(12), BigDecimal.valueOf(10),
-                null, catImprove, sp3, sp3.getBoard(), sp3Cols.get(Task.TaskStatus.DONE), new BigDecimal("5000"));
-        addLabels(t15, lBe, lPerf, lDb);
-        addTimeLog(t15, duc, "Phân tích query và thêm index", 4, LocalDate.of(2026, 2, 11));
-        addTimeLog(t15, duc, "Implement Redis cache layer", 5, LocalDate.of(2026, 2, 13));
-        addComment(t15, duc, "Sau khi thêm composite index (category_id, status, price) và cache Redis 5 phút, query xuống còn ~80ms. Đạt mục tiêu.");
-
-        // ── 12. Tasks Sprint 4 (ACTIVE) ──────────────────────────────────────
-        Task t16 = saveTask(project, 16, "Module quản lý đơn hàng",
-                "API đơn hàng: tạo đơn, xem chi tiết, cập nhật trạng thái, hủy đơn, lịch sử.",
+        Task m3 = saveTask(mapp, 3, "API mobile: đồng bộ dữ liệu offline",
+                "Sync strategy: local SQLite cache, conflict resolution, background sync khi có mạng.",
                 Task.TaskPriority.HIGH, Task.TaskStatus.IN_PROGRESS,
-                duc, admin, LocalDate.of(2026, 3, 17), LocalDate.of(2026, 3, 24),
-                BigDecimal.valueOf(24), null,
-                null, catFeature, sp4, sp4.getBoard(), sp4Cols.get(Task.TaskStatus.IN_PROGRESS), new BigDecimal("1000"));
-        addLabels(t16, lBe, lApi);
-        addTimeLog(t16, duc, "Implement tạo đơn hàng và danh sách đơn", 8, LocalDate.of(2026, 3, 20));
-        addComment(t16, duc, "Đã xong API tạo đơn và lấy danh sách. Đang implement cập nhật trạng thái.");
-        addComment(t16, nam, "Nhớ implement state machine cho order status: PENDING → CONFIRMED → SHIPPING → DELIVERED. Không cho phép nhảy cóc.");
+                duc, an,
+                LocalDate.of(2026, 3, 10), LocalDate.of(2026, 3, 20),
+                bd(24), null, null, mCatFeature,
+                null, mboard, mColDoing, bd(3000));
+        addLabels(m3, mlApi);
+        logTime(m3, duc, "SQLite schema + sync service skeleton", 8.0, LocalDate.of(2026, 3, 15));
+        comment(m3, duc, "Conflict resolution phức tạp hơn dự tính. Đang nghiên cứu CRDT approach.");
+        comment(m3, bich, "CRDT overkill cho use case này. Last-write-wins với server timestamp là đủ rồi.");
+        comment(m3, duc,  "Đồng ý, đổi sang LWW. Đơn giản hơn nhiều và đủ dùng.");
 
-        Task t16a = saveTask(project, 20, "Order state machine",
-                "Implement state machine kiểm soát luồng chuyển trạng thái đơn hàng.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.TODO,
-                duc, admin, LocalDate.of(2026, 3, 22), LocalDate.of(2026, 3, 24),
-                BigDecimal.valueOf(6), null,
-                t16, catFeature, sp4, sp4.getBoard(), sp4Cols.get(Task.TaskStatus.TODO), BigDecimal.ZERO);
-        addLabels(t16a, lBe);
-
-        Task t17 = saveTask(project, 17, "Giao diện quản lý đơn hàng",
-                "Trang quản lý đơn hàng cho admin: danh sách, lọc theo trạng thái, xem chi tiết, cập nhật.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.TODO,
-                lan, admin, LocalDate.of(2026, 3, 21), LocalDate.of(2026, 3, 27),
-                BigDecimal.valueOf(20), null,
-                null, catFeature, sp4, sp4.getBoard(), sp4Cols.get(Task.TaskStatus.TODO), new BigDecimal("2000"));
-        addLabels(t17, lFe, lUx);
-
-        Task t18 = saveTask(project, 18, "Tích hợp email thông báo đơn hàng",
-                "Gửi email tự động: xác nhận đơn, cập nhật trạng thái, thông báo giao hàng.",
+        Task m4 = saveTask(mapp, 4, "Push notification",
+                "Tích hợp Firebase FCM, gửi notification khi deal được cập nhật hoặc có reminder.",
                 Task.TaskPriority.MEDIUM, Task.TaskStatus.IN_REVIEW,
-                duc, admin, LocalDate.of(2026, 3, 17), LocalDate.of(2026, 3, 22),
-                BigDecimal.valueOf(12), BigDecimal.valueOf(11),
-                null, catFeature, sp4, sp4.getBoard(), sp4Cols.get(Task.TaskStatus.IN_REVIEW), new BigDecimal("3000"));
-        addLabels(t18, lBe);
-        addTimeLog(t18, duc, "Tạo email templates và implement email service", 8, LocalDate.of(2026, 3, 19));
-        addComment(t18, duc,   "Đã implement xong. Dùng Thymeleaf template cho email HTML. Gửi async để không block request.");
-        addComment(t18, tuan,  "Đang test các email template. Banner ảnh trong email bị vỡ layout trên Gmail mobile.");
-        addComment(t18, duc,   "Đã fix CSS inline cho email. Gmail không support external CSS nên cần inline hết.");
+                duc, an,
+                LocalDate.of(2026, 3, 12), LocalDate.of(2026, 3, 18),
+                bd(12), bd(12), null, mCatFeature,
+                null, mboard, mColReview, bd(4000));
+        addLabels(m4, mlApi, mlMobile);
+        logTime(m4, duc, "FCM integration và notification handler", 8.0, LocalDate.of(2026, 3, 16));
+        comment(m4, kiet, "Test notification: nhận được đúng content, deep link vào đúng màn hình. iOS cần xin permission lần đầu — UX flow OK.");
+        comment(m4, duc, "Cảm ơn @kiet.hoang. Đã xử lý edge case notification khi app ở foreground.");
 
-        Task t19 = saveTask(project, 19, "Fix bug: Lỗi hiển thị giá khi có discount",
-                "Khi sản phẩm có discount, giá hiển thị trong giỏ hàng khác với giá ở trang thanh toán.",
-                Task.TaskPriority.HIGH, Task.TaskStatus.IN_PROGRESS,
-                lan, tuan, LocalDate.of(2026, 3, 24), LocalDate.of(2026, 3, 26),
-                BigDecimal.valueOf(4), null,
-                null, catBug, sp4, sp4.getBoard(), sp4Cols.get(Task.TaskStatus.IN_PROGRESS), new BigDecimal("4000"));
-        addLabels(t19, lFe, lCrit);
-        addComment(t19, tuan, "Reproduce: Thêm sản phẩm có 20% discount vào giỏ → giá ở CartPage hiển thị đúng → sang CheckoutPage giá lại thành giá gốc.");
-        addComment(t19, lan,  "Root cause: CartPage tính discount ở frontend, CheckoutPage gọi lại API lấy price gốc. Đang fix để dùng discountedPrice từ API.");
+        Task m5 = saveTask(mapp, 5, "Fix bug: App crash khi mở deal có nhiều notes",
+                "Crash khi deal có >50 notes, lỗi `OutOfMemoryError` trong FlatList render.",
+                Task.TaskPriority.HIGH, Task.TaskStatus.TODO,
+                huong, kiet,
+                LocalDate.of(2026, 3, 20), LocalDate.of(2026, 3, 22),
+                bd(4), null, null, mCatBug,
+                null, mboard, mColTodo, bd(5000));
+        addLabels(m5, mlBug, mlMobile);
+        comment(m5, kiet, "Crash log: `RangeError: Maximum call stack size exceeded` trong NotesList. Deal test có 78 notes.");
+        comment(m5, huong, "Root cause: FlatList render all items không virtualise đúng. Fix bằng cách thêm `initialNumToRender` và `windowSize`.");
 
-        // ── 13. Tasks Sprint 5 (PLANNED) ─────────────────────────────────────
-        Task t21 = saveTask(project, 21, "Hệ thống đánh giá sản phẩm",
-                "Cho phép người dùng đánh giá sao và viết nhận xét sản phẩm đã mua. Hiển thị trung bình rating.",
+        Task m6 = saveTask(mapp, 6, "Màn hình chi tiết khách hàng",
+                "Profile khách hàng: thông tin liên hệ, lịch sử deals, timeline hoạt động, ghi chú nhanh.",
                 Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
-                duc, admin, null, null,
-                BigDecimal.valueOf(20), null,
-                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("1000"));
-        addLabels(t21, lBe, lApi);
+                huong, an,
+                null, null,
+                bd(20), null, null, mCatFeature,
+                null, mboard, mColBacklog, bd(6000));
+        addLabels(m6, mlMobile, mlUx);
 
-        Task t22 = saveTask(project, 22, "Tính năng yêu thích sản phẩm",
-                "Cho phép lưu sản phẩm yêu thích, đồng bộ giữa các thiết bị.",
-                Task.TaskPriority.LOW, Task.TaskStatus.TODO,
-                lan, admin, null, null,
-                BigDecimal.valueOf(8), null,
-                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("2000"));
-        addLabels(t22, lFe);
+        watch(m3, an);
+        watch(m4, an);
+        watch(m5, an);
+        watch(m5, bich);
 
-        Task t23 = saveTask(project, 23, "Cải thiện UX trang checkout",
-                "Rút gọn các bước checkout từ 4 bước xuống 2 bước. Thêm guest checkout.",
-                Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
-                lan, admin, null, null,
-                BigDecimal.valueOf(16), null,
-                null, catImprove, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("3000"));
-        addLabels(t23, lFe, lUx);
-
-        Task t24 = saveTask(project, 24, "API xuất báo cáo Excel",
-                "Xuất báo cáo doanh thu, đơn hàng, sản phẩm bán chạy ra file Excel.",
-                Task.TaskPriority.LOW, Task.TaskStatus.TODO,
-                duc, admin, null, null,
-                BigDecimal.valueOf(12), null,
-                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("4000"));
-        addLabels(t24, lBe, lApi);
-
-        Task t25 = saveTask(project, 25, "Module khuyến mãi và voucher",
-                "Tạo và quản lý mã giảm giá: theo %, theo số tiền cố định, giới hạn lượt dùng.",
-                Task.TaskPriority.MEDIUM, Task.TaskStatus.TODO,
-                duc, admin, null, null,
-                BigDecimal.valueOf(28), null,
-                null, catFeature, sp5, sp5.getBoard(), sp5Cols.get(Task.TaskStatus.TODO), new BigDecimal("5000"));
-        addLabels(t25, lBe, lApi);
-        addComment(t25, nam, "Cần confirm với stakeholder về các loại voucher trước khi implement. @nguyen.ducnv bạn có thể họp với PM tuần tới không?");
-
-        log.info("Demo data created: project TMDT with 25 tasks across 5 sprints, 5 users with system roles.");
+        log.info("Demo data seeded: 2 projects (CRM: 16 tasks / 4 sprints, MAPP: 6 tasks Kanban), 6 users.");
     }
 
-    // ── Helper methods ────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private Role findRole(String name) {
         return roleRepository.findByName(name)
                 .orElseThrow(() -> new IllegalStateException(
-                        "System role '" + name + "' not found — DataInitializer may not have run yet"));
+                        "System role '" + name + "' not found — DataInitializer chưa chạy."));
     }
 
-    private User createUser(String username, String fullName, String email) {
+    private User upsertUser(String username, String fullName, String email, boolean mustChange) {
         return userRepository.findByEmail(email).orElseGet(() ->
                 userRepository.save(User.builder()
                         .username(username)
                         .email(email)
-                        .passwordHash(passwordEncoder.encode("Demo@123456"))
+                        .passwordHash(passwordEncoder.encode(DEMO_PASSWORD))
                         .fullName(fullName)
                         .isActive(true)
                         .emailVerified(true)
-                        .mustChangePassword(false)
+                        .mustChangePassword(mustChange)
                         .build()));
     }
 
-    private void assignSystemRole(User user, Role role) {
+    private void grantSystemRole(User user, Role role) {
         if (!userRoleRepository.existsByUserIdAndRoleId(user.getId(), role.getId())) {
             userRoleRepository.save(UserRole.builder().user(user).role(role).build());
         }
@@ -459,14 +539,6 @@ public class DemoDataInitializer implements ApplicationRunner {
     private void addMember(Project project, User user, String role) {
         projectMemberRepository.save(ProjectMember.builder()
                 .project(project).user(user).role(role).build());
-    }
-
-    private BoardColumn saveColumn(Board board, String name, int position, String color,
-                                   Task.TaskStatus mappedStatus, boolean isCompleted) {
-        return boardColumnRepository.save(BoardColumn.builder()
-                .board(board).name(name).position(position).color(color)
-                .mappedStatus(mappedStatus).isCompleted(isCompleted)
-                .build());
     }
 
     private Label saveLabel(Project project, String name, String color) {
@@ -481,9 +553,9 @@ public class DemoDataInitializer implements ApplicationRunner {
 
     private Sprint saveSprint(Project project, String name, String goal,
                               Sprint.SprintStatus status, LocalDate start, LocalDate end) {
-        int nextPosition = boardRepository.findMaxPositionByProjectId(project.getId()).orElse(0) + 1;
+        int nextPos = boardRepository.findMaxPositionByProjectId(project.getId()).orElse(0) + 1;
         Board sprintBoard = boardRepository.save(Board.builder()
-                .project(project).name(name).position(nextPosition)
+                .project(project).name(name).position(nextPos)
                 .boardType(Board.BoardType.SCRUM).isDefault(false)
                 .build());
 
@@ -504,13 +576,21 @@ public class DemoDataInitializer implements ApplicationRunner {
         return sprintRepository.save(sprint);
     }
 
-    private Map<Task.TaskStatus, BoardColumn> loadSprintColumns(Sprint sprint) {
+    private Map<Task.TaskStatus, BoardColumn> sprintCols(Sprint sprint) {
         List<BoardColumn> cols = boardColumnRepository.findByBoardIdOrderByPositionAsc(sprint.getBoard().getId());
-        Map<Task.TaskStatus, BoardColumn> map = new HashMap<>();
-        for (BoardColumn col : cols) {
-            if (col.getMappedStatus() != null) map.put(col.getMappedStatus(), col);
+        Map<Task.TaskStatus, BoardColumn> map = new EnumMap<>(Task.TaskStatus.class);
+        for (BoardColumn c : cols) {
+            if (c.getMappedStatus() != null) map.put(c.getMappedStatus(), c);
         }
         return map;
+    }
+
+    private BoardColumn col(Board board, String name, int position, String color,
+                            Task.TaskStatus status, boolean isCompleted) {
+        return boardColumnRepository.save(BoardColumn.builder()
+                .board(board).name(name).position(position).color(color)
+                .mappedStatus(status).isCompleted(isCompleted)
+                .build());
     }
 
     private Task saveTask(Project project, int number, String title, String description,
@@ -542,15 +622,36 @@ public class DemoDataInitializer implements ApplicationRunner {
         }
     }
 
-    private void addTimeLog(Task task, User user, String description, double hours, LocalDate date) {
+    private void logTime(Task task, User user, String description, double hours, LocalDate date) {
         timeTrackingRepository.save(TimeTracking.builder()
                 .task(task).user(user).description(description)
                 .hours(BigDecimal.valueOf(hours)).workDate(date)
                 .build());
     }
 
-    private void addComment(Task task, User user, String content) {
+    private void comment(Task task, User user, String content) {
         commentRepository.save(Comment.builder()
                 .task(task).user(user).content(content).build());
+    }
+
+    private void watch(Task task, User user) {
+        taskWatcherRepository.save(TaskWatcher.builder().task(task).user(user).build());
+    }
+
+    private void saveNotification(User user, Notification.NotificationType type,
+                                  String title, String message,
+                                  Notification.RelatedType relatedType, java.util.UUID relatedId,
+                                  boolean isRead) {
+        Notification n = Notification.builder()
+                .user(user).type(type).title(title).message(message)
+                .relatedType(relatedType).relatedId(relatedId)
+                .isRead(isRead)
+                .build();
+        if (isRead) n.setReadAt(LocalDateTime.now().minusHours(2));
+        notificationRepository.save(n);
+    }
+
+    private static BigDecimal bd(double v) {
+        return BigDecimal.valueOf(v);
     }
 }

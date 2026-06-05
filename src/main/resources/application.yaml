@@ -108,7 +108,7 @@ application:
   ai:
     provider: ${AI_PROVIDER:gemini}         # gemini | openai
     gemini:
-      api-key: ${GEMINI_API_KEY:GEMINI_KEY_NOT_SET}
+      api-key: ${GEMINI_API_KEY:AIzaSyDcvIVEldQYj9VOZ-dbdxIC9Rszj3xXMls}
       model: ${GEMINI_MODEL:gemini-2.5-flash}
     openai:
       api-key: ${OPENAI_API_KEY:OPENAI_KEY_NOT_SET}

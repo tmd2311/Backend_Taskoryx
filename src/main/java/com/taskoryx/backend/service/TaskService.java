@@ -433,8 +433,15 @@ public class TaskService {
     }
 
     private void assignLabels(Task task, List<UUID> labelIds) {
-        // Labels are handled through TaskLabel entity - simplified here
-        // Full implementation would save TaskLabel entities
+        for (UUID labelId : labelIds) {
+            Label label = labelRepository.findById(labelId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Label", "id", labelId));
+            if (!label.getProject().getId().equals(task.getProject().getId())) {
+                throw new BadRequestException("Label không thuộc dự án hiện tại");
+            }
+            TaskLabel taskLabel = TaskLabel.builder().task(task).label(label).build();
+            task.getTaskLabels().add(taskLabel);
+        }
     }
 
     private void validateTaskFilter(UUID projectId, TaskFilterRequest filter) {
