@@ -144,11 +144,13 @@ public class ProjectAuthorizationService {
                     ProjectPermission.TIME_TRACKING_MANAGE,
                     ProjectPermission.BOARD_VIEW
             );
-            // ADMIN (system) trong dự án — xem task, không chỉnh sửa nội dung dự án
+            // ADMIN (system) trong dự án — xem task, xem/ghi nhận giờ, xem báo cáo, không chỉnh sửa nội dung dự án
             case "ADMIN" -> Set.of(
                     ProjectPermission.TASK_VIEW,
                     ProjectPermission.BOARD_VIEW,
-                    ProjectPermission.REPORT_VIEW
+                    ProjectPermission.REPORT_VIEW,
+                    ProjectPermission.TIME_TRACKING_VIEW,
+                    ProjectPermission.TIME_TRACKING_MANAGE
             );
             default -> Set.of();
         };

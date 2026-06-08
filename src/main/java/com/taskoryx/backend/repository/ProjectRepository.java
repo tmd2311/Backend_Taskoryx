@@ -19,14 +19,14 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     Optional<Project> findByKey(String key);
 
-    // Lấy tất cả project của user (owner hoặc member)
+    // Lấy tất cả project của user (owner, member, hoặc project public)
     @Query("SELECT DISTINCT p FROM Project p LEFT JOIN p.members m " +
-           "WHERE (p.owner.id = :userId OR m.user.id = :userId) " +
+           "WHERE (p.owner.id = :userId OR m.user.id = :userId OR p.isPublic = true) " +
            "AND p.isArchived = false ORDER BY p.updatedAt DESC")
     List<Project> findProjectsByUserId(@Param("userId") UUID userId);
 
     @Query("SELECT DISTINCT p FROM Project p LEFT JOIN p.members m " +
-           "WHERE (p.owner.id = :userId OR m.user.id = :userId) " +
+           "WHERE (p.owner.id = :userId OR m.user.id = :userId OR p.isPublic = true) " +
            "AND p.isArchived = false " +
            "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(p.key) LIKE LOWER(CONCAT('%', :keyword, '%')))")
