@@ -51,8 +51,8 @@ public class ExportController {
             @Parameter(description = "Sheet cần xuất, phân cách phẩy. VD: overview,tasks,overdue")
             @RequestParam(required = false) Set<String> sheets,
 
-            @Parameter(description = "Lọc theo sprint ID")
-            @RequestParam(required = false) UUID sprintId,
+            @Parameter(description = "Lọc theo một hoặc nhiều sprint ID, phân cách phẩy")
+            @RequestParam(required = false) List<UUID> sprintIds,
 
             @Parameter(description = "Lọc theo assignee (user ID)")
             @RequestParam(required = false) UUID assigneeId,
@@ -73,7 +73,7 @@ public class ExportController {
 
         ExportFilter filter = new ExportFilter();
         filter.setSheets(sheets);
-        filter.setSprintId(sprintId);
+        filter.setSprintIds(sprintIds);
         filter.setAssigneeId(assigneeId);
         filter.setDateFrom(dateFrom);
         filter.setDateTo(dateTo);

@@ -70,9 +70,8 @@ public class ExportService {
                 : members;
 
         List<Sprint> sprints = sprintRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
-        // Nếu lọc theo sprint thì chỉ giữ sprint đó
-        List<Sprint> filteredSprints = (filter.getSprintId() != null)
-                ? sprints.stream().filter(s -> filter.getSprintId().equals(s.getId())).collect(Collectors.toList())
+        List<Sprint> filteredSprints = (filter.getSprintIds() != null && !filter.getSprintIds().isEmpty())
+                ? sprints.stream().filter(s -> filter.getSprintIds().contains(s.getId())).collect(Collectors.toList())
                 : sprints;
 
         LocalDate today = LocalDate.now();
@@ -102,8 +101,8 @@ public class ExportService {
     // ── Áp dụng filter lên danh sách task ─────────────────────────────────────
     private List<Task> applyFilter(List<Task> tasks, ExportFilter f) {
         return tasks.stream()
-                .filter(t -> f.getSprintId() == null
-                        || (t.getSprint() != null && f.getSprintId().equals(t.getSprint().getId())))
+                .filter(t -> f.getSprintIds() == null || f.getSprintIds().isEmpty()
+                        || (t.getSprint() != null && f.getSprintIds().contains(t.getSprint().getId())))
                 .filter(t -> f.getAssigneeId() == null
                         || (t.getAssignee() != null && f.getAssigneeId().equals(t.getAssignee().getId())))
                 .filter(t -> f.getStatuses() == null || f.getStatuses().isEmpty()
@@ -645,8 +644,8 @@ public class ExportService {
     // FILTER DESCRIPTION HELPER
     private String buildFilterDescription(ExportFilter f) {
         List<String> parts = new ArrayList<>();
-        if (f.getSprintId() != null)
-            parts.add("Sprint: " + f.getSprintId());
+        if (f.getSprintIds() != null && !f.getSprintIds().isEmpty())
+            parts.add("Sprint: " + f.getSprintIds().stream().map(UUID::toString).collect(Collectors.joining(", ")));
         if (f.getAssigneeId() != null)
             parts.add("Người thực hiện: " + f.getAssigneeId());
         if (f.getDateFrom() != null)

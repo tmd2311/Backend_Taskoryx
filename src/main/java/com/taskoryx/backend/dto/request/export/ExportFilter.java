@@ -23,8 +23,8 @@ public class ExportFilter {
      */
     private Set<String> sheets;
 
-    /** Lọc task thuộc sprint cụ thể. Null = tất cả sprint + backlog. */
-    private UUID sprintId;
+    /** Lọc task thuộc một hoặc nhiều sprint. Null/rỗng = tất cả sprint + backlog. */
+    private List<UUID> sprintIds;
 
     /** Lọc task được giao cho thành viên cụ thể. Null = tất cả thành viên. */
     private UUID assigneeId;
