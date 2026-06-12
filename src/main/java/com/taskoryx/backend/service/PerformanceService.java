@@ -36,7 +36,7 @@ public class PerformanceService {
      */
     @Transactional(readOnly = true)
     public List<UserPerformanceResponse> getProjectPerformance(UUID projectId, UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.REPORT_VIEW);
+        projectAuthorizationService.requireProjectAccess(projectId, principal.getId());
         return performanceRepository.findByProjectIdAndSprintIsNullOrderByTotalScoreDesc(projectId)
                 .stream()
                 .map(UserPerformanceResponse::from)
@@ -133,7 +133,7 @@ public class PerformanceService {
     @Transactional(readOnly = true)
     public List<UserPerformanceResponse> getSprintPerformance(UUID projectId, UUID sprintId,
                                                                UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.REPORT_VIEW);
+        projectAuthorizationService.requireProjectAccess(projectId, principal.getId());
         sprintRepository.findById(sprintId)
                 .filter(s -> s.getProject().getId().equals(projectId))
                 .orElseThrow(() -> new ResourceNotFoundException("Sprint", "id", sprintId));

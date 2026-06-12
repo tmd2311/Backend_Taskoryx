@@ -7,7 +7,6 @@ import com.taskoryx.backend.dto.response.dashboard.UserDashboardResponse;
 import com.taskoryx.backend.dto.response.notification.NotificationResponse;
 import com.taskoryx.backend.dto.response.task.TaskSummaryResponse;
 import com.taskoryx.backend.dto.response.timetracking.TimeTrackingResponse;
-import com.taskoryx.backend.entity.ProjectPermission;
 import com.taskoryx.backend.entity.Task;
 import com.taskoryx.backend.repository.ActivityLogRepository;
 import com.taskoryx.backend.repository.BoardRepository;
@@ -45,7 +44,6 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public ProjectDashboardResponse getProjectDashboard(UUID projectId, UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.REPORT_VIEW);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
 
         // Đếm tasks theo status

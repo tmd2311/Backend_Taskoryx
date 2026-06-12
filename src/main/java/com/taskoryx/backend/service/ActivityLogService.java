@@ -34,7 +34,7 @@ public class ActivityLogService {
     @Transactional(readOnly = true)
     public Page<ActivityLogResponse> getProjectActivityFeed(UUID projectId, int page, int size,
                                                              UserPrincipal principal) {
-        projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.REPORT_VIEW);
+        projectAuthorizationService.requireProjectAccess(projectId, principal.getId());
 
         PageRequest pageable = PageRequest.of(page, size);
         return activityLogRepository.findByProjectIdOrderByCreatedAtDesc(projectId, pageable)
