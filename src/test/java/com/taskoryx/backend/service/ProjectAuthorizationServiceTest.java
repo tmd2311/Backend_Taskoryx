@@ -2,11 +2,13 @@ package com.taskoryx.backend.service;
 
 import com.taskoryx.backend.entity.Project;
 import com.taskoryx.backend.entity.ProjectPermission;
+import com.taskoryx.backend.entity.ProjectRole;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.ForbiddenException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.ProjectRepository;
+import com.taskoryx.backend.repository.ProjectRoleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,22 +17,23 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProjectAuthorizationService - Permission & Access Tests")
 class ProjectAuthorizationServiceTest {
 
-    @Mock
-    private ProjectRepository projectRepository;
-    @Mock
-    private ProjectMemberRepository projectMemberRepository;
+    @Mock private ProjectRepository projectRepository;
+    @Mock private ProjectMemberRepository projectMemberRepository;
+    @Mock private ProjectRoleRepository projectRoleRepository;
 
     @InjectMocks
     private ProjectAuthorizationService authzService;
@@ -44,21 +47,24 @@ class ProjectAuthorizationServiceTest {
 
     @BeforeEach
     void setUp() {
-        projectId = UUID.randomUUID();
-        ownerId = UUID.randomUUID();
-        memberId = UUID.randomUUID();
+        projectId  = UUID.randomUUID();
+        ownerId    = UUID.randomUUID();
+        memberId   = UUID.randomUUID();
         outsiderId = UUID.randomUUID();
 
         owner = User.builder().id(ownerId).username("owner")
                 .email("owner@test.com").passwordHash("hash").fullName("Owner").build();
 
         project = Project.builder()
-                .id(projectId)
-                .name("Test Project")
-                .key("TEST")
-                .owner(owner)
-                .isPublic(false)
-                .build();
+                .id(projectId).name("Test Project").key("TEST")
+                .owner(owner).isPublic(false).build();
+    }
+
+    // Helper: tạo custom role với danh sách quyền nâng cao
+    private ProjectRole customRole(String name, String... advancedPerms) {
+        ProjectRole role = new ProjectRole();
+        role.setPermissionList(List.of(advancedPerms));
+        return role;
     }
 
     // ─── requireProjectAccess ─────────────────────────────────────────────────
@@ -72,18 +78,18 @@ class ProjectAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("Member (MEMBER role) có thể truy cập project")
-    void requireProjectAccess_memberRole_returnsProject() {
+    @DisplayName("Member có thể truy cập project")
+    void requireProjectAccess_member_returnsProject() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
-                .thenReturn(Optional.of("MEMBER"));
+                .thenReturn(Optional.of("Dev"));
 
         Project result = authzService.requireProjectAccess(projectId, memberId);
         assertThat(result).isNotNull();
     }
 
     @Test
-    @DisplayName("User không phải member project private → ForbiddenException")
+    @DisplayName("User không phải member của project private → ForbiddenException")
     void requireProjectAccess_outsider_private_throws() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, outsiderId))
@@ -108,8 +114,7 @@ class ProjectAuthorizationServiceTest {
     @DisplayName("Owner là admin của project")
     void requireProjectAdmin_owner_succeeds() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        Project result = authzService.requireProjectAdmin(projectId, ownerId);
-        assertThat(result).isNotNull();
+        assertThat(authzService.requireProjectAdmin(projectId, ownerId)).isNotNull();
     }
 
     @Test
@@ -120,102 +125,148 @@ class ProjectAuthorizationServiceTest {
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, pmId))
                 .thenReturn(Optional.of("PROJECT_MANAGER"));
 
-        Project result = authzService.requireProjectAdmin(projectId, pmId);
-        assertThat(result).isNotNull();
+        assertThat(authzService.requireProjectAdmin(projectId, pmId)).isNotNull();
     }
 
     @Test
-    @DisplayName("MEMBER không phải admin → ForbiddenException")
+    @DisplayName("Member thường không phải admin → ForbiddenException")
     void requireProjectAdmin_member_throws() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
-                .thenReturn(Optional.of("MEMBER"));
+                .thenReturn(Optional.of("Dev"));
 
         assertThatThrownBy(() -> authzService.requireProjectAdmin(projectId, memberId))
                 .isInstanceOf(ForbiddenException.class);
     }
 
-    // ─── requirePermission ────────────────────────────────────────────────────
+    // ─── Quyền cơ bản (BASIC) — mọi member đều có ───────────────────────────
+
+    @Test
+    @DisplayName("Mọi member đều có TASK_VIEW dù custom role không khai báo")
+    void basicPermission_taskView_alwaysGranted() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
+                .thenReturn(Optional.of("Intern"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "Intern"))
+                .thenReturn(Optional.of(customRole("Intern"))); // không có quyền nâng cao nào
+
+        authzService.requirePermission(projectId, memberId, ProjectPermission.TASK_VIEW);
+    }
+
+    @Test
+    @DisplayName("Mọi member đều có TIME_TRACKING_MANAGE dù custom role không khai báo")
+    void basicPermission_timeTrackingManage_alwaysGranted() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
+                .thenReturn(Optional.of("Tester"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "Tester"))
+                .thenReturn(Optional.of(customRole("Tester")));
+
+        authzService.requirePermission(projectId, memberId, ProjectPermission.TIME_TRACKING_MANAGE);
+    }
+
+    @Test
+    @DisplayName("Mọi member đều có TASK_CREATE, TASK_UPDATE, COMMENT_CREATE, BOARD_VIEW")
+    void basicPermission_otherBasicPerms_alwaysGranted() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
+                .thenReturn(Optional.of("Dev"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "Dev"))
+                .thenReturn(Optional.of(customRole("Dev")));
+
+        for (String perm : ProjectPermission.BASIC) {
+            authzService.requirePermission(projectId, memberId, perm);
+        }
+    }
+
+    // ─── Quyền nâng cao — cần khai báo trong custom role ─────────────────────
+
+    @Test
+    @DisplayName("Member không có quyền nâng cao nếu custom role không khai báo")
+    void advancedPermission_notGranted_ifNotInRole() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
+                .thenReturn(Optional.of("Dev"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "Dev"))
+                .thenReturn(Optional.of(customRole("Dev"))); // không cấp gì thêm
+
+        assertThatThrownBy(() ->
+                authzService.requirePermission(projectId, memberId, ProjectPermission.SPRINT_MANAGE))
+                .isInstanceOf(ForbiddenException.class);
+
+        assertThatThrownBy(() ->
+                authzService.requirePermission(projectId, memberId, ProjectPermission.MEMBER_MANAGE))
+                .isInstanceOf(ForbiddenException.class);
+
+        assertThatThrownBy(() ->
+                authzService.requirePermission(projectId, memberId, ProjectPermission.REPORT_VIEW))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    @DisplayName("Custom role được cấp SPRINT_MANAGE thì có quyền đó")
+    void advancedPermission_sprintManage_grantedIfInRole() {
+        UUID leadId = UUID.randomUUID();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, leadId))
+                .thenReturn(Optional.of("TeamLead"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "TeamLead"))
+                .thenReturn(Optional.of(customRole("TeamLead",
+                        ProjectPermission.SPRINT_MANAGE,
+                        ProjectPermission.REPORT_VIEW,
+                        ProjectPermission.TASK_DELETE)));
+
+        authzService.requirePermission(projectId, leadId, ProjectPermission.SPRINT_MANAGE);
+        authzService.requirePermission(projectId, leadId, ProjectPermission.REPORT_VIEW);
+        authzService.requirePermission(projectId, leadId, ProjectPermission.TASK_DELETE);
+    }
+
+    @Test
+    @DisplayName("Custom role có SPRINT_MANAGE nhưng không có MEMBER_MANAGE")
+    void advancedPermission_partialGrant() {
+        UUID leadId = UUID.randomUUID();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, leadId))
+                .thenReturn(Optional.of("TeamLead"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "TeamLead"))
+                .thenReturn(Optional.of(customRole("TeamLead", ProjectPermission.SPRINT_MANAGE)));
+
+        authzService.requirePermission(projectId, leadId, ProjectPermission.SPRINT_MANAGE);
+
+        assertThatThrownBy(() ->
+                authzService.requirePermission(projectId, leadId, ProjectPermission.MEMBER_MANAGE))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    // ─── Owner & SUPER_ADMIN ──────────────────────────────────────────────────
 
     @Test
     @DisplayName("Owner có tất cả permission")
     void requirePermission_owner_allPermissions() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
-        // Không ném exception = pass
         for (String perm : ProjectPermission.ALL) {
             authzService.requirePermission(projectId, ownerId, perm);
         }
     }
 
     @Test
-    @DisplayName("MEMBER có quyền TASK_CREATE")
-    void requirePermission_member_hasTaskCreate() {
+    @DisplayName("SUPER_ADMIN có toàn quyền trong project")
+    void requirePermission_superAdmin_allPermissions() {
+        UUID superAdminId = UUID.randomUUID();
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
-                .thenReturn(Optional.of("MEMBER"));
+        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, superAdminId))
+                .thenReturn(Optional.of("SUPER_ADMIN"));
 
-        // Không ném exception = có quyền
-        authzService.requirePermission(projectId, memberId, ProjectPermission.TASK_CREATE);
+        for (String perm : ProjectPermission.ALL) {
+            authzService.requirePermission(projectId, superAdminId, perm);
+        }
     }
 
-    @Test
-    @DisplayName("MEMBER KHÔNG có quyền SPRINT_MANAGE")
-    void requirePermission_member_noSprintManage() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
-                .thenReturn(Optional.of("MEMBER"));
-
-        assertThatThrownBy(() ->
-                authzService.requirePermission(projectId, memberId, ProjectPermission.SPRINT_MANAGE))
-                .isInstanceOf(ForbiddenException.class);
-    }
+    // ─── Public project ───────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("TEAM_LEAD có quyền SPRINT_MANAGE")
-    void requirePermission_teamLead_hasSprintManage() {
-        UUID teamLeadId = UUID.randomUUID();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, teamLeadId))
-                .thenReturn(Optional.of("TEAM_LEAD"));
-
-        authzService.requirePermission(projectId, teamLeadId, ProjectPermission.SPRINT_MANAGE);
-    }
-
-    @Test
-    @DisplayName("TEAM_LEAD KHÔNG có quyền MEMBER_MANAGE")
-    void requirePermission_teamLead_noMemberManage() {
-        UUID teamLeadId = UUID.randomUUID();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, teamLeadId))
-                .thenReturn(Optional.of("TEAM_LEAD"));
-
-        assertThatThrownBy(() ->
-                authzService.requirePermission(projectId, teamLeadId, ProjectPermission.MEMBER_MANAGE))
-                .isInstanceOf(ForbiddenException.class);
-    }
-
-    @Test
-    @DisplayName("ADMIN (system role trong project) chỉ có TASK_VIEW, BOARD_VIEW, REPORT_VIEW")
-    void requirePermission_adminRole_limitedPermissions() {
-        UUID adminId = UUID.randomUUID();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, adminId))
-                .thenReturn(Optional.of("ADMIN"));
-
-        // Có quyền
-        authzService.requirePermission(projectId, adminId, ProjectPermission.TASK_VIEW);
-        authzService.requirePermission(projectId, adminId, ProjectPermission.BOARD_VIEW);
-        authzService.requirePermission(projectId, adminId, ProjectPermission.REPORT_VIEW);
-
-        // Không có quyền
-        assertThatThrownBy(() ->
-                authzService.requirePermission(projectId, adminId, ProjectPermission.TASK_CREATE))
-                .isInstanceOf(ForbiddenException.class);
-    }
-
-    @Test
-    @DisplayName("User không có role nào trong project private → ForbiddenException")
+    @DisplayName("User không có role trong project private → ForbiddenException")
     void requirePermission_noRole_privateProject_throws() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, outsiderId))
@@ -234,45 +285,35 @@ class ProjectAuthorizationServiceTest {
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, outsiderId))
                 .thenReturn(Optional.empty());
 
-        // View permissions được phép trên public project
         authzService.requirePermission(projectId, outsiderId, ProjectPermission.TASK_VIEW);
         authzService.requirePermission(projectId, outsiderId, ProjectPermission.BOARD_VIEW);
-    }
-
-    @Test
-    @DisplayName("SUPER_ADMIN có toàn quyền trong project")
-    void requirePermission_superAdmin_allPermissions() {
-        UUID superAdminId = UUID.randomUUID();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, superAdminId))
-                .thenReturn(Optional.of("SUPER_ADMIN"));
-
-        for (String perm : ProjectPermission.ALL) {
-            authzService.requirePermission(projectId, superAdminId, perm);
-        }
     }
 
     // ─── hasPermission (non-throwing) ─────────────────────────────────────────
 
     @Test
-    @DisplayName("hasPermission() trả về true khi có quyền")
-    void hasPermission_withPermission_returnsTrue() {
+    @DisplayName("hasPermission() trả về true với quyền cơ bản")
+    void hasPermission_basicPerm_returnsTrue() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
-                .thenReturn(Optional.of("MEMBER"));
+                .thenReturn(Optional.of("Dev"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "Dev"))
+                .thenReturn(Optional.of(customRole("Dev")));
 
-        boolean result = authzService.hasPermission(projectId, memberId, ProjectPermission.TASK_VIEW);
-        assertThat(result).isTrue();
+        assertThat(authzService.hasPermission(projectId, memberId, ProjectPermission.TASK_VIEW)).isTrue();
+        assertThat(authzService.hasPermission(projectId, memberId, ProjectPermission.TIME_TRACKING_MANAGE)).isTrue();
     }
 
     @Test
-    @DisplayName("hasPermission() trả về false khi không có quyền")
-    void hasPermission_withoutPermission_returnsFalse() {
+    @DisplayName("hasPermission() trả về false với quyền nâng cao chưa được cấp")
+    void hasPermission_advancedNotGranted_returnsFalse() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(projectMemberRepository.findRoleByProjectIdAndUserId(projectId, memberId))
-                .thenReturn(Optional.of("MEMBER"));
+                .thenReturn(Optional.of("Dev"));
+        when(projectRoleRepository.findByProjectIdAndName(projectId, "Dev"))
+                .thenReturn(Optional.of(customRole("Dev")));
 
-        boolean result = authzService.hasPermission(projectId, memberId, ProjectPermission.SPRINT_MANAGE);
-        assertThat(result).isFalse();
+        assertThat(authzService.hasPermission(projectId, memberId, ProjectPermission.SPRINT_MANAGE)).isFalse();
+        assertThat(authzService.hasPermission(projectId, memberId, ProjectPermission.MEMBER_MANAGE)).isFalse();
     }
 }
