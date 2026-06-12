@@ -104,7 +104,22 @@ public class AiInputGuard {
 
         // Cố thoát context JSON / HTML injection
         Pattern.compile("(?i)(</?(script|html|body|head)>|javascript:|data:text|onerror=|onload=)"),
-        Pattern.compile("\\}\\s*,?\\s*\\{\\s*\"role\"")
+        Pattern.compile("\\}\\s*,?\\s*\\{\\s*\"role\""),
+
+        // Thu thập / truy xuất dữ liệu từ hệ thống ngoài — Tiếng Việt
+        Pattern.compile("(?i)(truy\\s*xuất|thu\\s*thập|lấy\\s*cắp|đánh\\s*cắp|scrape?|crawl)\\s+(dữ\\s*liệu|thông\\s*tin)\\s+(người\\s*dùng|tài\\s*khoản|khách\\s*hàng)\\s+(của|từ)\\s+(hệ\\s*thống|website|app|ứng\\s*dụng|trang\\s*web)\\s*(khác|bên\\s*ngoài|đối\\s*thủ|khác)?"),
+        Pattern.compile("(?i)(thu\\s*thập|truy\\s*xuất|lấy)\\s+(trái\\s*phép|không\\s*được\\s*phép|bất\\s*hợp\\s*pháp|lén\\s*lút)\\s+(dữ\\s*liệu|thông\\s*tin)"),
+        Pattern.compile("(?i)(hack|tấn\\s*công|xâm\\s*nhập|khai\\s*thác|bypass|vượt\\s*qua)\\s+(hệ\\s*thống|bảo\\s*mật|xác\\s*thực|mật\\s*khẩu|tường\\s*lửa|firewall)"),
+        Pattern.compile("(?i)(tấn\\s*công|xâm\\s*nhập|phá\\s*hoại)\\s+(server|máy\\s*chủ|website|web|hệ\\s*thống|mạng|database|cơ\\s*sở\\s*dữ\\s*liệu|vào)"),
+        Pattern.compile("(?i)(phần\\s*mềm\\s*gián\\s*điệp|spyware|malware|ransomware|virus|trojan|keylogger|botnet)"),
+        Pattern.compile("(?i)(theo\\s*dõi|giám\\s*sát).{0,40}(mà\\s*không|không\\s*có|không\\s*được|không\\s*biết).{0,30}(sự\\s*đồng\\s*ý|cho\\s*phép|biết|đồng\\s*ý)"),
+        Pattern.compile("(?i)(đánh\\s*cắp|chiếm\\s*đoạt|lấy\\s*trộm)\\s+(tài\\s*khoản|mật\\s*khẩu|thông\\s*tin|dữ\\s*liệu|thẻ\\s*tín\\s*dụng|token)"),
+
+        // Thu thập dữ liệu từ hệ thống ngoài — Tiếng Anh
+        Pattern.compile("(?i)(scrape?|crawl|harvest|steal|exfiltrate)\\s+(user\\s+)?(data|information|credentials?|accounts?)\\s+(from|of)\\s+(other|another|external|third.party|competitor)\\s+(system|website|app|platform)"),
+        Pattern.compile("(?i)(unauthorized|illegal|covert|secret)\\s+(data|information)\\s+(collection|harvesting|extraction|access)"),
+        Pattern.compile("(?i)(hack|breach|exploit|bypass|infiltrate|compromise)\\s+(the\\s+)?(system|security|authentication|firewall|server|database)"),
+        Pattern.compile("(?i)(spy(ware)?|malware|ransomware|trojan|keylogger|botnet|rootkit)")
     );
 
     // ── 3. PROJECT KEYWORDS — ít nhất 1 cái phải xuất hiện ───────────────────

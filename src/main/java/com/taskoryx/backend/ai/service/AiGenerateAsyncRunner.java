@@ -7,6 +7,7 @@ import com.taskoryx.backend.ai.prompt.ProjectPlanPrompt;
 import com.taskoryx.backend.dto.response.notification.NotificationResponse;
 import com.taskoryx.backend.entity.AiGenerateSession;
 import com.taskoryx.backend.entity.Notification;
+import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.repository.AiGenerateSessionRepository;
 import com.taskoryx.backend.repository.NotificationRepository;
 import com.taskoryx.backend.service.WebSocketNotificationService;
@@ -97,6 +98,14 @@ public class AiGenerateAsyncRunner {
             log.info("AI generate session ready: sessionId={}, tasks={}", sessionId, totalTaskCount);
             sendReadyNotification(session);
 
+        } catch (BadRequestException e) {
+            // LLM rejected request (safety/validation) hoặc parse error — thông báo rõ lý do
+            log.warn("AI generate rejected/invalid: sessionId={}, reason={}", sessionId, e.getMessage());
+            session.setStatus(AiGenerateSession.SessionStatus.FAILED);
+            session.setErrorMessage(e.getMessage());
+            session.setFinishedAt(LocalDateTime.now());
+            sessionRepository.save(session);
+            sendRejectedNotification(session, e.getMessage());
         } catch (Exception e) {
             log.error("AI generate session failed: sessionId={}", sessionId, e);
             session.setStatus(AiGenerateSession.SessionStatus.FAILED);
@@ -135,6 +144,27 @@ public class AiGenerateAsyncRunner {
                     session.getUser().getId(), session.getId());
         } catch (Exception e) {
             log.error("Failed to send ready notification: sessionId={}", session.getId(), e);
+        }
+    }
+
+    private void sendRejectedNotification(AiGenerateSession session, String reason) {
+        try {
+            Notification notification = Notification.builder()
+                    .user(session.getUser())
+                    .type(Notification.NotificationType.TASK_UPDATED)
+                    .title("Yêu cầu AI bị từ chối")
+                    .message(reason != null ? reason : "Yêu cầu không phù hợp để lập kế hoạch dự án.")
+                    .relatedType(Notification.RelatedType.PROJECT)
+                    .relatedId(null)
+                    .build();
+            notification = notificationRepository.save(notification);
+
+            webSocketNotificationService.sendNotificationToUser(
+                    session.getUser().getId(), NotificationResponse.from(notification));
+            webSocketNotificationService.sendAiPlanRejected(
+                    session.getUser().getId(), session.getId(), notification.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to send rejected notification: sessionId={}", session.getId(), e);
         }
     }
 

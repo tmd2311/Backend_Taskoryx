@@ -58,6 +58,22 @@ public class WebSocketNotificationService {
         }
     }
 
+    // Send AI plan rejected event (safety/validation) to specific user
+    public void sendAiPlanRejected(UUID userId, UUID sessionId, String reason) {
+        try {
+            messagingTemplate.convertAndSendToUser(
+                userId.toString(),
+                "/queue/ai-plan-ready",
+                new WebSocketEvent("AI_PLAN_REJECTED", java.util.Map.of(
+                    "sessionId", sessionId.toString(),
+                    "reason", reason != null ? reason : ""
+                ))
+            );
+        } catch (Exception e) {
+            log.error("Failed to send AI plan rejected event to user {}", userId, e);
+        }
+    }
+
     // Inner class for WebSocket events
     @lombok.Data
     @lombok.AllArgsConstructor
