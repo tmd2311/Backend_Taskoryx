@@ -41,5 +41,38 @@ public final class ProjectPermission {
             SPRINT_MANAGE, MEMBER_MANAGE, REPORT_VIEW, PERFORMANCE_CALCULATE, WEBHOOK_MANAGE
     );
 
+    /**
+     * Quyền cơ bản — mọi thành viên trong project đều có, không cần khai báo trong custom role.
+     * Bao gồm: xem/tạo/sửa task, ghi nhận giờ, xem board, comment, đính kèm file.
+     */
+    public static final Set<String> BASIC = Set.of(
+            TASK_VIEW,
+            TASK_CREATE,
+            TASK_UPDATE,
+            TASK_ASSIGN,
+            COMMENT_CREATE,
+            ATTACHMENT_MANAGE,
+            TIME_TRACKING_VIEW,
+            TIME_TRACKING_MANAGE,
+            BOARD_VIEW
+    );
+
+    /**
+     * Quyền nâng cao — cần được cấp rõ ràng trong custom role.
+     * Bao gồm: xóa task, quản lý sprint/label/category/member/webhook, xem báo cáo.
+     */
+    public static final Set<String> ADVANCED = Set.of(
+            TASK_DELETE,
+            COMMENT_DELETE,
+            LABEL_MANAGE,
+            CATEGORY_MANAGE,
+            BOARD_UPDATE,
+            SPRINT_MANAGE,
+            MEMBER_MANAGE,
+            REPORT_VIEW,
+            PERFORMANCE_CALCULATE,
+            WEBHOOK_MANAGE
+    );
+
     private ProjectPermission() {}
 }

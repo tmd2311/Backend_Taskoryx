@@ -36,8 +36,17 @@ public class ProjectCapabilityService {
 
     public void requireModule(Project project, String module) {
         if (!isModuleEnabled(project, module)) {
-            throw new BadRequestException("Dự án này không bật module " + normalize(module));
+            throw new BadRequestException(moduleDisabledMessage(normalize(module)));
         }
+    }
+
+    private String moduleDisabledMessage(String module) {
+        return switch (module) {
+            case MODULE_TIME_TRACKING -> "Dự án này chưa bật tính năng ghi nhận giờ làm việc. Vui lòng liên hệ quản trị viên dự án để kích hoạt.";
+            case MODULE_SPRINT        -> "Dự án này chưa bật tính năng Sprint. Vui lòng liên hệ quản trị viên dự án để kích hoạt.";
+            case MODULE_ATTACHMENT    -> "Dự án này chưa bật tính năng đính kèm tệp. Vui lòng liên hệ quản trị viên dự án để kích hoạt.";
+            default                  -> "Tính năng này chưa được kích hoạt trong dự án. Vui lòng liên hệ quản trị viên dự án.";
+        };
     }
 
     public boolean isModuleEnabled(UUID projectId, String module) {

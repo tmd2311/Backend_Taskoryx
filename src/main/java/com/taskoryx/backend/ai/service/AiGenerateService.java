@@ -29,6 +29,8 @@ public class AiGenerateService {
     private final AiGenerateAsyncRunner asyncRunner;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final AiRateLimiter rateLimiter;
+    private final AiInputGuard inputGuard;
 
     /**
      * Tạo session GENERATING và trả về ngay (HTTP 202).
@@ -36,13 +38,16 @@ public class AiGenerateService {
      */
     @Transactional
     public AiGenerateSessionResponse startGenerate(AiGeneratePlanRequest request, UserPrincipal principal) {
+        rateLimiter.checkGenerate(principal.getId());
+        inputGuard.validate(request.getRequirement());
+
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
 
         AiGenerateSession session = AiGenerateSession.builder()
                 .user(user)
                 .status(AiGenerateSession.SessionStatus.GENERATING)
-                .requirement(request.getRequirement())
+                .requirement(inputGuard.sanitize(request.getRequirement()))
                 .language(request.getLanguage() != null ? request.getLanguage() : "vi")
                 .build();
 

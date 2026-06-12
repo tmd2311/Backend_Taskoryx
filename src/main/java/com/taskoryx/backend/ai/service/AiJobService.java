@@ -28,6 +28,7 @@ public class AiJobService {
     private final AiJobAsyncRunner asyncRunner;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final AiRateLimiter rateLimiter;
 
     /**
      * Tạo job và enqueue — trả về ngay (HTTP 202).
@@ -35,6 +36,8 @@ public class AiJobService {
      */
     @Transactional
     public AiJobResponse enqueueJob(AiConfirmPlanRequest request, UserPrincipal principal) {
+        rateLimiter.checkConfirm(principal.getId());
+
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy user"));
 
