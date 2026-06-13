@@ -193,9 +193,7 @@ public class AdminService {
         // Gửi email chào mừng kèm mật khẩu tạm (async - không block)
         emailService.sendWelcomeEmail(user.getEmail(), user.getFullName(), tempPassword);
 
-        return AdminUserResponse.from(user).toBuilder()
-                .temporaryPassword(tempPassword)
-                .build();
+        return AdminUserResponse.from(user);
     }
 
     @Transactional
