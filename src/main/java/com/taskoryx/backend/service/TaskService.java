@@ -57,11 +57,14 @@ public class TaskService {
 
     @Transactional
     public TaskResponse createTask(UUID projectId, CreateTaskRequest request, UserPrincipal principal) {
+        validateTaskDates(request.getStartDate(), request.getDueDate(), null);
+
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_CREATE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
         validateCreateRequestAgainstProjectConfig(project, request);
 
         Sprint sprint = findSprintInProject(projectId, request.getSprintId());
+        validateTaskDatesAgainstSprint(request.getStartDate(), request.getDueDate(), sprint);
         if (sprint.getBoard() == null) {
             throw new BadRequestException("Sprint chưa có kanban board");
         }
@@ -202,6 +205,12 @@ public class TaskService {
         if (request.getDescription() != null) task.setDescription(request.getDescription());
         if (request.getPriority() != null) task.setPriority(request.getPriority());
         if (request.getStatus() != null) applyStatus(task, request.getStatus());
+
+        LocalDate effectiveStartDate = request.getStartDate() != null ? request.getStartDate() : task.getStartDate();
+        LocalDate effectiveDueDate = request.getDueDate() != null ? request.getDueDate() : task.getDueDate();
+        validateTaskDates(effectiveStartDate, effectiveDueDate, task.getId());
+        // Sprint date validation happens after sprint is resolved below
+
         if (request.getStartDate() != null) task.setStartDate(request.getStartDate());
         if (request.getDueDate() != null) task.setDueDate(request.getDueDate());
         if (request.getEstimatedHours() != null) task.setEstimatedHours(request.getEstimatedHours());
@@ -240,7 +249,10 @@ public class TaskService {
             detachTaskFromSprint(task);
         } else if (request.getSprintId() != null) {
             Sprint sprint = findSprintInProject(task.getProject().getId(), request.getSprintId());
+            validateTaskDatesAgainstSprint(task.getStartDate(), task.getDueDate(), sprint);
             attachTaskToSprint(task, sprint);
+        } else if (task.getSprint() != null && (request.getStartDate() != null || request.getDueDate() != null)) {
+            validateTaskDatesAgainstSprint(task.getStartDate(), task.getDueDate(), task.getSprint());
         }
 
         // Handle parent task
@@ -812,6 +824,29 @@ public class TaskService {
         List<Task> children = taskRepository.findByParentTaskId(taskId);
         for (Task child : children) {
             collectSubTreeIdsRecursive(child.getId(), ids);
+        }
+    }
+
+    private void validateTaskDates(LocalDate startDate, LocalDate dueDate, UUID taskId) {
+        if (dueDate != null && dueDate.isBefore(LocalDate.now())) {
+            throw new BadRequestException("Ngày kết thúc (dueDate) không được nhỏ hơn ngày hiện tại");
+        }
+        if (startDate != null && dueDate != null && dueDate.isBefore(startDate)) {
+            throw new BadRequestException("Ngày kết thúc (dueDate) không được trước ngày bắt đầu (startDate)");
+        }
+    }
+
+    private void validateTaskDatesAgainstSprint(LocalDate startDate, LocalDate dueDate, Sprint sprint) {
+        if (sprint == null) return;
+        LocalDate sprintStart = sprint.getStartDate();
+        LocalDate sprintEnd = sprint.getEndDate();
+        if (startDate != null && sprintStart != null && startDate.isBefore(sprintStart)) {
+            throw new BadRequestException(
+                    "Ngày bắt đầu task (" + startDate + ") không được trước ngày bắt đầu sprint (" + sprintStart + ")");
+        }
+        if (dueDate != null && sprintEnd != null && dueDate.isAfter(sprintEnd)) {
+            throw new BadRequestException(
+                    "Ngày kết thúc task (" + dueDate + ") không được sau ngày kết thúc sprint (" + sprintEnd + ")");
         }
     }
 }
