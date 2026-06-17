@@ -57,7 +57,7 @@ public class TaskService {
 
     @Transactional
     public TaskResponse createTask(UUID projectId, CreateTaskRequest request, UserPrincipal principal) {
-        validateTaskDates(request.getStartDate(), request.getDueDate(), null);
+        validateTaskDates(request.getStartDate(), request.getDueDate(), false);
 
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_CREATE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
@@ -104,6 +104,7 @@ public class TaskService {
             if (!parentTask.canHaveChildren()) {
                 throw new BadRequestException("Task cha đã ở cấp 3, không thể thêm task con (giới hạn tối đa 3 cấp)");
             }
+            validateTaskDatesAgainstParent(request.getStartDate(), request.getDueDate(), parentTask);
         }
 
         Task task = Task.builder()
@@ -205,11 +206,15 @@ public class TaskService {
         if (request.getTitle() != null) task.setTitle(request.getTitle());
         if (request.getDescription() != null) task.setDescription(request.getDescription());
         if (request.getPriority() != null) task.setPriority(request.getPriority());
-        if (request.getStatus() != null) applyStatus(task, request.getStatus());
+        if (request.getStatus() != null) {
+            validateParentCompletionAllowed(task, request.getStatus());
+            applyStatus(task, request.getStatus());
+        }
 
         LocalDate effectiveStartDate = request.getStartDate() != null ? request.getStartDate() : task.getStartDate();
         LocalDate effectiveDueDate = request.getDueDate() != null ? request.getDueDate() : task.getDueDate();
-        validateTaskDates(effectiveStartDate, effectiveDueDate, task.getId());
+        // Chỉ kiểm tra dueDate quá khứ khi user chủ động gửi dueDate mới
+        validateTaskDates(effectiveStartDate, effectiveDueDate, request.getDueDate() == null);
         validateTaskDatesAgainstProject(effectiveStartDate, effectiveDueDate, task.getProject());
         // Sprint date validation happens after sprint is resolved below
 
@@ -283,7 +288,11 @@ public class TaskService {
                         "Không thể gán task cha này vì sẽ khiến cây con vượt quá 3 cấp (cấp cha: "
                         + parentDepth + ", chiều sâu cây con: " + maxChildDepth + ")");
             }
+            validateTaskDatesAgainstParent(effectiveStartDate, effectiveDueDate, parent);
             task.setParentTask(parent);
+        } else if (task.getParentTask() != null && (request.getStartDate() != null || request.getDueDate() != null)) {
+            // Parent không thay đổi nhưng date thay đổi → vẫn phải validate
+            validateTaskDatesAgainstParent(effectiveStartDate, effectiveDueDate, task.getParentTask());
         }
 
         Task saved = taskRepository.save(task);
@@ -357,11 +366,17 @@ public class TaskService {
 
         // Nếu cột có mappedStatus → tự động set trạng thái task
         if (targetColumn.getMappedStatus() != null) {
+            validateParentCompletionAllowed(task, targetColumn.getMappedStatus());
             task.setStatus(targetColumn.getMappedStatus());
         }
 
         // Đánh dấu hoàn thành nếu chuyển vào cột đã hoàn thành
+        // (validateParentCompletionAllowed đã chạy ở trên nếu mappedStatus được set)
         if (targetColumn.getIsCompleted() && task.getCompletedAt() == null) {
+            if (targetColumn.getMappedStatus() == null) {
+                // mappedStatus null → chưa validate bên trên, cần validate riêng
+                validateParentCompletionAllowed(task, Task.TaskStatus.DONE);
+            }
             task.setCompletedAt(LocalDateTime.now());
         } else if (!targetColumn.getIsCompleted() && task.getCompletedAt() != null) {
             task.setCompletedAt(null);
@@ -412,6 +427,7 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
         projectAuthorizationService.requirePermission(task.getProject().getId(), principal.getId(),
                 ProjectPermission.TASK_UPDATE);
+        validateParentCompletionAllowed(task, request.getStatus());
         String oldStatus = task.getStatus().name();
         applyStatus(task, request.getStatus());
         Task saved = taskRepository.save(task);
@@ -707,6 +723,7 @@ public class TaskService {
     }
 
     private Sprint findSprintInProject(UUID projectId, UUID sprintId) {
+        if (sprintId == null) return null;
         Sprint sprint = sprintRepository.findById(sprintId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sprint", "id", sprintId));
         if (!sprint.getProject().getId().equals(projectId)) {
@@ -767,7 +784,6 @@ public class TaskService {
 
         if (excludeTaskId == null) {
             return candidates.stream()
-                    .filter(t -> t.getParentTask() == null)
                     .map(TaskSummaryResponse::from)
                     .collect(Collectors.toList());
         }
@@ -776,7 +792,6 @@ public class TaskService {
         Set<UUID> excludedIds = collectSubTreeIds(excludeTaskId);
 
         return candidates.stream()
-                .filter(t -> t.getParentTask() == null)
                 .filter(t -> !excludedIds.contains(t.getId()))
                 .map(TaskSummaryResponse::from)
                 .collect(Collectors.toList());
@@ -829,8 +844,8 @@ public class TaskService {
         }
     }
 
-    private void validateTaskDates(LocalDate startDate, LocalDate dueDate, UUID taskId) {
-        if (dueDate != null && dueDate.isBefore(LocalDate.now())) {
+    private void validateTaskDates(LocalDate startDate, LocalDate dueDate, boolean skipPastCheck) {
+        if (!skipPastCheck && dueDate != null && dueDate.isBefore(LocalDate.now())) {
             throw new BadRequestException("Ngày kết thúc (dueDate) không được nhỏ hơn ngày hiện tại");
         }
         if (startDate != null && dueDate != null && dueDate.isBefore(startDate)) {
@@ -863,6 +878,39 @@ public class TaskService {
         if (dueDate != null && projectEnd != null && dueDate.isAfter(projectEnd)) {
             throw new BadRequestException(
                     "Ngày kết thúc task (" + dueDate + ") không được sau ngày kết thúc dự án (" + projectEnd + ")");
+        }
+    }
+
+    // Task con phải nằm trong khoảng thời gian của task cha
+    private void validateTaskDatesAgainstParent(LocalDate startDate, LocalDate dueDate, Task parent) {
+        if (parent == null) return;
+        LocalDate parentStart = parent.getStartDate();
+        LocalDate parentEnd   = parent.getDueDate();
+        if (startDate != null && parentStart != null && startDate.isBefore(parentStart)) {
+            throw new BadRequestException(
+                    "Ngày bắt đầu task con (" + startDate + ") không được trước ngày bắt đầu task cha (" + parentStart + ")");
+        }
+        if (dueDate != null && parentEnd != null && dueDate.isAfter(parentEnd)) {
+            throw new BadRequestException(
+                    "Ngày kết thúc task con (" + dueDate + ") không được sau ngày kết thúc task cha (" + parentEnd + ")");
+        }
+    }
+
+    // Task cha không được chuyển sang DONE/RESOLVED khi còn task con chưa hoàn thành
+    private void validateParentCompletionAllowed(Task task, Task.TaskStatus newStatus) {
+        boolean isCompleting = newStatus == Task.TaskStatus.DONE || newStatus == Task.TaskStatus.RESOLVED;
+        if (!isCompleting) return;
+        List<Task> subTasks = taskRepository.findByParentTaskId(task.getId());
+        if (subTasks.isEmpty()) return;
+        long unfinished = subTasks.stream()
+                .filter(c -> c.getStatus() != Task.TaskStatus.DONE
+                        && c.getStatus() != Task.TaskStatus.RESOLVED
+                        && c.getStatus() != Task.TaskStatus.CANCELLED)
+                .count();
+        if (unfinished > 0) {
+            throw new BadRequestException(
+                    "Không thể hoàn thành task cha khi còn " + unfinished + " task con chưa hoàn thành. "
+                    + "Hãy hoàn thành hoặc huỷ tất cả task con trước.");
         }
     }
 }
