@@ -16,14 +16,11 @@ public class AiProjectPlan {
     @JsonProperty("project_description")
     private String projectDescription;
 
-    /** Mã dự án đề xuất (2-10 ký tự hoa). AI sinh, backend sẽ validate/điều chỉnh nếu trùng. */
     @JsonProperty("project_key")
     private String projectKey;
 
-    /** Tổng thời gian dự kiến (ngày). */
     @JsonProperty("total_duration_days")
     private Integer totalDurationDays;
 
-    /** Danh sách sprint với tasks phân bổ sẵn. */
     private List<AiSprintItem> sprints;
 }

@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
 public class UpdateProjectRequest {
 
@@ -21,4 +23,6 @@ public class UpdateProjectRequest {
     private TemplateConfigDto projectConfig;
     private Boolean isPublic;
     private Boolean isArchived;
+    private LocalDate startDate;
+    private LocalDate endDate;
 }

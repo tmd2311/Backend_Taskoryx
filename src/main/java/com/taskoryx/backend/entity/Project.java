@@ -7,6 +7,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -66,6 +67,12 @@ public class Project {
     @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "{project.color.pattern}")
     @Builder.Default
     private String color = "#1976d2";
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
 
     @Column(name = "is_public", nullable = false)
     @Builder.Default

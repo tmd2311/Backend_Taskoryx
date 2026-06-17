@@ -4,23 +4,29 @@ import com.taskoryx.backend.ai.dto.response.AiExecuteResult;
 import com.taskoryx.backend.ai.dto.response.AiProjectPlan;
 import com.taskoryx.backend.ai.dto.response.AiSprintItem;
 import com.taskoryx.backend.ai.dto.response.AiTaskItem;
+import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
 import com.taskoryx.backend.entity.Board;
 import com.taskoryx.backend.entity.BoardColumn;
+import com.taskoryx.backend.entity.IssueCategory;
+import com.taskoryx.backend.entity.Label;
 import com.taskoryx.backend.entity.Project;
 import com.taskoryx.backend.entity.Sprint;
 import com.taskoryx.backend.entity.Task;
+import com.taskoryx.backend.entity.TaskLabel;
 import com.taskoryx.backend.entity.User;
 import com.taskoryx.backend.exception.BadRequestException;
 import com.taskoryx.backend.exception.ResourceNotFoundException;
 import com.taskoryx.backend.repository.BoardColumnRepository;
 import com.taskoryx.backend.repository.BoardRepository;
+import com.taskoryx.backend.repository.IssueCategoryRepository;
+import com.taskoryx.backend.repository.LabelRepository;
+import com.taskoryx.backend.repository.ProjectMemberRepository;
 import com.taskoryx.backend.repository.ProjectRepository;
 import com.taskoryx.backend.repository.SprintRepository;
 import com.taskoryx.backend.repository.TaskRepository;
 import com.taskoryx.backend.repository.UserRepository;
-import com.taskoryx.backend.service.ProjectService;
 import com.taskoryx.backend.security.UserPrincipal;
-import com.taskoryx.backend.dto.request.project.CreateProjectRequest;
+import com.taskoryx.backend.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -48,6 +54,9 @@ public class AiPlanExecutor {
     private final TaskRepository taskRepository;
     private final SprintRepository sprintRepository;
     private final BoardColumnRepository boardColumnRepository;
+    private final LabelRepository labelRepository;
+    private final IssueCategoryRepository issueCategoryRepository;
+    private final ProjectMemberRepository projectMemberRepository;
 
     private static final Pattern KEY_PATTERN = Pattern.compile("^[A-Z0-9]{2,10}$");
 
@@ -86,7 +95,8 @@ public class AiPlanExecutor {
                         Task parent = buildTask(item, project, sprint, todoColumn, reporter, null,
                                 sprintStartDate, taskNumberCounter.incrementAndGet(),
                                 positionCounter.incrementAndGet());
-                        taskRepository.save(parent);
+                        parent = taskRepository.save(parent);
+                        assignTaskLabels(parent, item.getLabelIds(), project.getId());
                         taskCount.incrementAndGet();
 
                         if (item.getSubTasks() != null) {
@@ -94,7 +104,8 @@ public class AiPlanExecutor {
                                 Task child = buildTask(subItem, project, sprint, todoColumn, reporter, parent,
                                         sprintStartDate, taskNumberCounter.incrementAndGet(),
                                         positionCounter.incrementAndGet());
-                                taskRepository.save(child);
+                                child = taskRepository.save(child);
+                                assignTaskLabels(child, subItem.getLabelIds(), project.getId());
                                 subTaskCount.incrementAndGet();
                             }
                         }
@@ -128,10 +139,13 @@ public class AiPlanExecutor {
         sprintBoard = boardRepository.save(sprintBoard);
         createStatusColumns(sprintBoard);
 
-        LocalDate startDate = projectStartDate.plusDays(
-                sprintItem.getStartOffsetDays() != null ? sprintItem.getStartOffsetDays() : 0);
-        LocalDate endDate = startDate.plusDays(
-                sprintItem.getDurationDays() != null ? sprintItem.getDurationDays() : 14);
+        // Ưu tiên ngày tuyệt đối (do user chỉnh sửa), fallback về offset
+        LocalDate startDate = sprintItem.getStartDate() != null
+                ? sprintItem.getStartDate()
+                : projectStartDate.plusDays(sprintItem.getStartOffsetDays() != null ? sprintItem.getStartOffsetDays() : 0);
+        LocalDate endDate = sprintItem.getEndDate() != null
+                ? sprintItem.getEndDate()
+                : startDate.plusDays(sprintItem.getDurationDays() != null ? sprintItem.getDurationDays() : 14);
 
         Sprint sprint = Sprint.builder()
                 .project(project)
@@ -206,23 +220,59 @@ public class AiPlanExecutor {
         task.setTitle(item.getTitle());
         task.setDescription(item.getDescription());
         task.setPriority(item.getPriority() != null ? item.getPriority() : Task.TaskPriority.MEDIUM);
-        task.setStatus(Task.TaskStatus.TODO);
+        task.setStatus(item.getStatus() != null ? item.getStatus() : Task.TaskStatus.TODO);
         task.setProject(project);
         task.setSprint(sprint);
-        task.setColumn(column);
+        task.setColumn(resolveColumnForStatus(sprint, task.getStatus(), column));
         task.setReporter(reporter);
         task.setParentTask(parent);
         task.setTaskNumber(taskNumber);
+        task.setEstimatedHours(item.getEstimatedHours());
 
-        if (item.getStartOffsetDays() != null) {
+        // Ưu tiên ngày tuyệt đối (do user chỉnh sửa), fallback về offset
+        if (item.getStartDate() != null) {
+            task.setStartDate(item.getStartDate());
+        } else if (item.getStartOffsetDays() != null) {
             task.setStartDate(baseDate.plusDays(item.getStartOffsetDays()));
         }
-        if (item.getDurationDays() != null && task.getStartDate() != null) {
+        if (item.getDueDate() != null) {
+            task.setDueDate(item.getDueDate());
+        } else if (item.getDurationDays() != null && task.getStartDate() != null) {
             task.setDueDate(task.getStartDate().plusDays(item.getDurationDays()));
+        }
+
+        // Gán assignee nếu user chỉ định và là thành viên project
+        if (item.getAssigneeId() != null
+                && projectMemberRepository.existsByProjectIdAndUserId(project.getId(), item.getAssigneeId())) {
+            userRepository.findById(item.getAssigneeId()).ifPresent(task::setAssignee);
+        }
+
+        // Gán category nếu thuộc project
+        if (item.getCategoryId() != null) {
+            issueCategoryRepository.findById(item.getCategoryId())
+                    .filter(c -> c.getProject().getId().equals(project.getId()))
+                    .ifPresent(task::setCategory);
         }
 
         task.setPosition(BigDecimal.valueOf(position));
         return task;
+    }
+
+    private void assignTaskLabels(Task task, List<UUID> labelIds, UUID projectId) {
+        if (labelIds == null || labelIds.isEmpty()) return;
+        for (UUID labelId : labelIds) {
+            labelRepository.findById(labelId)
+                    .filter(l -> l.getProject().getId().equals(projectId))
+                    .ifPresent(label -> task.getTaskLabels().add(
+                            TaskLabel.builder().task(task).label(label).build()));
+        }
+    }
+
+    private BoardColumn resolveColumnForStatus(Sprint sprint, Task.TaskStatus status, BoardColumn fallback) {
+        if (sprint == null || sprint.getBoard() == null || status == null) return fallback;
+        return boardColumnRepository
+                .findByBoardIdAndMappedStatus(sprint.getBoard().getId(), status)
+                .orElse(fallback);
     }
 
     private String sanitizeProjectKey(String raw) {

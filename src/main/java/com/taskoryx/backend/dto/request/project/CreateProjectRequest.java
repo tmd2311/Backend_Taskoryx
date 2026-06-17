@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
 public class CreateProjectRequest {
 
@@ -26,4 +28,6 @@ public class CreateProjectRequest {
     private String projectType;
     private TemplateConfigDto projectConfig;
     private Boolean isPublic = false;
+    private LocalDate startDate;
+    private LocalDate endDate;
 }

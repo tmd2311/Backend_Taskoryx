@@ -62,6 +62,7 @@ public class TaskService {
         projectAuthorizationService.requirePermission(projectId, principal.getId(), ProjectPermission.TASK_CREATE);
         var project = projectService.findProjectWithAccess(projectId, principal.getId());
         validateCreateRequestAgainstProjectConfig(project, request);
+        validateTaskDatesAgainstProject(request.getStartDate(), request.getDueDate(), project);
 
         Sprint sprint = findSprintInProject(projectId, request.getSprintId());
         validateTaskDatesAgainstSprint(request.getStartDate(), request.getDueDate(), sprint);
@@ -209,6 +210,7 @@ public class TaskService {
         LocalDate effectiveStartDate = request.getStartDate() != null ? request.getStartDate() : task.getStartDate();
         LocalDate effectiveDueDate = request.getDueDate() != null ? request.getDueDate() : task.getDueDate();
         validateTaskDates(effectiveStartDate, effectiveDueDate, task.getId());
+        validateTaskDatesAgainstProject(effectiveStartDate, effectiveDueDate, task.getProject());
         // Sprint date validation happens after sprint is resolved below
 
         if (request.getStartDate() != null) task.setStartDate(request.getStartDate());
@@ -847,6 +849,20 @@ public class TaskService {
         if (dueDate != null && sprintEnd != null && dueDate.isAfter(sprintEnd)) {
             throw new BadRequestException(
                     "Ngày kết thúc task (" + dueDate + ") không được sau ngày kết thúc sprint (" + sprintEnd + ")");
+        }
+    }
+
+    private void validateTaskDatesAgainstProject(LocalDate startDate, LocalDate dueDate, Project project) {
+        if (project == null) return;
+        LocalDate projectStart = project.getStartDate();
+        LocalDate projectEnd   = project.getEndDate();
+        if (startDate != null && projectStart != null && startDate.isBefore(projectStart)) {
+            throw new BadRequestException(
+                    "Ngày bắt đầu task (" + startDate + ") không được trước ngày bắt đầu dự án (" + projectStart + ")");
+        }
+        if (dueDate != null && projectEnd != null && dueDate.isAfter(projectEnd)) {
+            throw new BadRequestException(
+                    "Ngày kết thúc task (" + dueDate + ") không được sau ngày kết thúc dự án (" + projectEnd + ")");
         }
     }
 }

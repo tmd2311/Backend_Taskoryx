@@ -32,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -70,6 +71,8 @@ public class ProjectService {
         if (projectRepository.existsByKey(request.getKey())) {
             throw new BadRequestException("Mã dự án '" + request.getKey() + "' đã tồn tại");
         }
+        validateProjectDates(request.getStartDate(), request.getEndDate());
+
         User owner = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", principal.getId()));
 
@@ -85,6 +88,8 @@ public class ProjectService {
                 .configVersion(1)
                 .isPublic(request.getIsPublic() != null ? request.getIsPublic() : false)
                 .isArchived(false)
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
                 .build();
         project = projectRepository.save(project);
 
@@ -134,6 +139,12 @@ public class ProjectService {
         }
         if (request.getIsPublic() != null) project.setIsPublic(request.getIsPublic());
         if (request.getIsArchived() != null) project.setIsArchived(request.getIsArchived());
+
+        LocalDate newStart = request.getStartDate() != null ? request.getStartDate() : project.getStartDate();
+        LocalDate newEnd   = request.getEndDate()   != null ? request.getEndDate()   : project.getEndDate();
+        validateProjectDates(newStart, newEnd);
+        if (request.getStartDate() != null) project.setStartDate(request.getStartDate());
+        if (request.getEndDate()   != null) project.setEndDate(request.getEndDate());
 
         Project saved = projectRepository.save(project);
         User actor = userRepository.findById(principal.getId()).orElseThrow();
@@ -333,6 +344,12 @@ public class ProjectService {
                 .toUpperCase()
                 .replace(' ', '_')
                 .replace('-', '_');
+    }
+
+    private void validateProjectDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && !startDate.isBefore(endDate)) {
+            throw new BadRequestException("Ngày bắt đầu dự án phải trước ngày kết thúc");
+        }
     }
 
     private String serializeProjectConfig(Object config) {

@@ -58,6 +58,7 @@ public class SprintService {
                 throw new BadRequestException("Ngày bắt đầu phải trước ngày kết thúc");
             }
         }
+        validateSprintDatesAgainstProject(request.getStartDate(), request.getEndDate(), project);
 
         // Tự động tạo sprint board với các cột theo trạng thái task
         int maxPos = boardRepository.findMaxPositionByProjectId(projectId).orElse(-1);
@@ -180,6 +181,7 @@ public class SprintService {
         if (newStart != null && newEnd != null && !newStart.isBefore(newEnd)) {
             throw new BadRequestException("Ngày bắt đầu phải trước ngày kết thúc");
         }
+        validateSprintDatesAgainstProject(newStart, newEnd, sprint.getProject());
 
         if (request.getStartDate() != null) sprint.setStartDate(request.getStartDate());
         if (request.getEndDate()   != null) sprint.setEndDate(request.getEndDate());
@@ -381,5 +383,20 @@ public class SprintService {
             task.setSprint(null);
             taskRepository.save(task);
         });
+    }
+
+    private void validateSprintDatesAgainstProject(LocalDate sprintStart, LocalDate sprintEnd, Project project) {
+        LocalDate projectStart = project.getStartDate();
+        LocalDate projectEnd   = project.getEndDate();
+        if (projectStart == null && projectEnd == null) return;
+
+        if (sprintStart != null && projectStart != null && sprintStart.isBefore(projectStart)) {
+            throw new BadRequestException(
+                    "Ngày bắt đầu sprint (" + sprintStart + ") không được trước ngày bắt đầu dự án (" + projectStart + ")");
+        }
+        if (sprintEnd != null && projectEnd != null && sprintEnd.isAfter(projectEnd)) {
+            throw new BadRequestException(
+                    "Ngày kết thúc sprint (" + sprintEnd + ") không được sau ngày kết thúc dự án (" + projectEnd + ")");
+        }
     }
 }

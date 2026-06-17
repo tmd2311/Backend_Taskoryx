@@ -2,8 +2,10 @@ package com.taskoryx.backend.ai.controller;
 
 import com.taskoryx.backend.ai.dto.request.AiConfirmPlanRequest;
 import com.taskoryx.backend.ai.dto.request.AiGeneratePlanRequest;
+import com.taskoryx.backend.ai.dto.request.UpdateSessionPlanRequest;
 import com.taskoryx.backend.ai.dto.response.AiGenerateSessionResponse;
 import com.taskoryx.backend.ai.dto.response.AiJobResponse;
+import com.taskoryx.backend.ai.dto.response.AiProjectPlan;
 import com.taskoryx.backend.ai.service.AiGenerateService;
 import com.taskoryx.backend.ai.service.AiJobService;
 import com.taskoryx.backend.dto.response.ApiResponse;
@@ -54,6 +56,21 @@ public class AiProjectPlanController {
             @AuthenticationPrincipal UserPrincipal principal) {
         AiGenerateSessionResponse session = aiGenerateService.getSession(sessionId, principal);
         return ApiResponse.success("Lấy session thành công", session);
+    }
+
+    @PatchMapping("/sessions/{sessionId}/plan")
+    @PreAuthorize("hasAuthority('PROJECT_CREATE')")
+    @Operation(
+        summary = "Cập nhật plan đã chỉnh sửa vào session",
+        description = "Cho phép user edit plan (thêm/xóa/sửa sprint, task) sau khi AI generate xong. " +
+                      "Session phải ở trạng thái READY. Khi confirm dùng sessionId, BE sẽ lấy plan từ session này."
+    )
+    public ApiResponse<AiGenerateSessionResponse> updateSessionPlan(
+            @PathVariable UUID sessionId,
+            @RequestBody UpdateSessionPlanRequest body,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        AiGenerateSessionResponse session = aiGenerateService.updateSessionPlan(sessionId, body.getPlan(), principal);
+        return ApiResponse.success("Đã lưu plan chỉnh sửa", session);
     }
 
     @PostMapping("/confirm")

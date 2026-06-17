@@ -67,6 +67,31 @@ public class AiGenerateService {
     }
 
     /**
+     * Lưu lại plan đã được user chỉnh sửa vào session. Chỉ cho phép khi session ở trạng thái READY.
+     */
+    @Transactional
+    public AiGenerateSessionResponse updateSessionPlan(UUID sessionId, AiProjectPlan editedPlan, UserPrincipal principal) {
+        AiGenerateSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy session"));
+
+        if (!session.getUser().getId().equals(principal.getId())) {
+            throw new ForbiddenException("Bạn không có quyền chỉnh sửa session này");
+        }
+        if (session.getStatus() != AiGenerateSession.SessionStatus.READY) {
+            throw new com.taskoryx.backend.exception.BadRequestException(
+                    "Chỉ có thể chỉnh sửa plan khi session ở trạng thái READY");
+        }
+
+        try {
+            session.setPlanJson(objectMapper.writeValueAsString(editedPlan));
+        } catch (Exception e) {
+            throw new com.taskoryx.backend.exception.BadRequestException("Không thể serialize plan");
+        }
+        session = sessionRepository.save(session);
+        return AiGenerateSessionResponse.from(session, editedPlan);
+    }
+
+    /**
      * Poll trạng thái session. Khi READY trả kèm plan đã parse.
      */
     @Transactional(readOnly = true)
@@ -81,7 +106,11 @@ public class AiGenerateService {
         AiProjectPlan plan = null;
         if (session.getStatus() == AiGenerateSession.SessionStatus.READY && session.getPlanJson() != null) {
             try {
+                log.debug("planJson preview: {}", session.getPlanJson().length() > 200
+                        ? session.getPlanJson().substring(0, 200) : session.getPlanJson());
                 plan = objectMapper.readValue(session.getPlanJson(), AiProjectPlan.class);
+                log.debug("plan parsed: projectName={}, sprints={}", plan.getProjectName(),
+                        plan.getSprints() != null ? plan.getSprints().size() : null);
             } catch (Exception e) {
                 log.error("Failed to parse plan JSON for session {}", sessionId, e);
             }

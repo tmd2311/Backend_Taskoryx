@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -33,6 +34,8 @@ public class ProjectResponse {
     private int memberCount;
     private int taskCount;
     private String currentUserRole;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -61,6 +64,8 @@ public class ProjectResponse {
                 .ownerId(project.getOwner().getId())
                 .memberCount(project.getMembers().size())
                 .taskCount(project.getTasks().size())
+                .startDate(project.getStartDate())
+                .endDate(project.getEndDate())
                 .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt())
                 .build();
